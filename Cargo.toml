@@ -1,0 +1,15 @@
+[package]
+name = "tensorevo"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+env_logger = "*"
+ndarray = { version = "0.15.6", features = ["serde"] }
+num-traits = "*"
+log = "*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"

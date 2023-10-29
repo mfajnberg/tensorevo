@@ -1,0 +1,47 @@
+{
+  "layers": [
+    {
+      "weights": [
+        [
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ],
+      "biases": [
+        [
+          0.0
+        ],
+        [
+          -1.0
+        ]
+      ],
+      "activation": "sigmoid"
+    },
+    {
+      "weights": [
+        [
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ],
+      "biases": [
+        [
+          0.0
+        ],
+        [
+          -1.0
+        ]
+      ],
+      "activation": "sigmoid"
+    }
+  ],
+  "error_validation": null
+}

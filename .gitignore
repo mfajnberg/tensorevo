@@ -1,0 +1,8 @@
+# IDE project settings:
+/.vscode/
+/.idea/
+# Compiled scripts/documents:
+build/
+target/
+# Package lock files / version checksums / etc.:
+Cargo.lock
