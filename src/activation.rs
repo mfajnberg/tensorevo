@@ -15,10 +15,7 @@ use crate::tensor::Tensor;
 /// This is used in the `Layer` struct.
 /// Facilitates (de-)serialization.
 #[derive(Debug, Eq, PartialEq)]
-pub struct Activation<T>
-where
-    T: Tensor,
-{
+pub struct Activation<T: Tensor> {
     name: String,
     function: fn(&T) -> T,
     derivative: fn(&T) -> T,
@@ -31,7 +28,6 @@ where
     T: Tensor,
     T::Element: From<f32>,
 {
-
     /// Hard-coded constructor for available activation functions.
     pub fn from_name(name: &str) -> Self {
         let function: fn(&T) -> T;
@@ -202,6 +198,47 @@ mod tests {
     use super::*;
     use crate::tensor::NDTensor;
 
+    mod test_activation {
+        use super::*;
+
+        #[test]
+        fn test_from_name() {
+            let activation: Activation<NDTensor<f64>> = Activation::from_name("relu");
+            let expected_activation = Activation {
+                name: "relu".to_owned(),
+                function: relu,
+                derivative: relu_prime
+            };
+            assert_eq!(activation, expected_activation);
+        }
+
+        #[test]
+        fn test_call() {
+            let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
+            let activation = Activation {
+                name: "relu".to_owned(),
+                function: relu,
+                derivative: relu_prime
+            };
+            let output = activation.call(&tensor);
+            let expected_output = NDTensor::from_vec(&vec![vec![0., 2.]]);
+            assert_eq!(output, expected_output);
+        }
+
+        #[test]
+        fn test_call_derivative() {
+            let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
+            let activation = Activation{
+                name: "relu".to_owned(),
+                function: relu,
+                derivative: relu_prime
+            };
+            let output = activation.call_derivative(&tensor);
+            let expected_output = NDTensor::from_vec(&vec![vec![0., 1.]]);
+            assert_eq!(output, expected_output);
+        }
+    }
+
     #[test]
     fn test_sigmoid_inplace() {
         let mut tensor = NDTensor::from_vec(&vec![vec![0., 36.]]);
@@ -209,42 +246,4 @@ mod tests {
         let expected_tensor = NDTensor::from_vec(&vec![vec![0.5, 0.9999999999999998]]);
         assert_eq!(tensor, expected_tensor);
     }
-    
-    #[test]
-    fn test_from_name() {
-        let activation: Activation<NDTensor<f64>> = Activation::from_name("relu");
-        let expected_activation = Activation{
-            name: "relu".to_owned(),
-            function: relu,
-            derivative: relu_prime
-        };
-        assert_eq!(activation, expected_activation);
-    }    
-
-    #[test]
-    fn test_call() {
-        let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
-        let activation = Activation{
-            name: "relu".to_owned(),
-            function: relu,
-            derivative: relu_prime
-        };
-        let output = activation.call(&tensor);
-        let expected_output = NDTensor::from_vec(&vec![vec![0., 2.]]);
-        assert_eq!(output, expected_output);
-    }
-
-    #[test]
-    fn test_call_derivative() {
-        let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
-        let activation = Activation{
-            name: "relu".to_owned(),
-            function: relu,
-            derivative: relu_prime
-        };
-        let output = activation.call_derivative(&tensor);
-        let expected_output = NDTensor::from_vec(&vec![vec![0., 1.]]);
-        assert_eq!(output, expected_output);
-    }
-
 }
