@@ -130,7 +130,7 @@ where
     T: Tensor,
     T::Element: From<f32>
 {
-    tensor.map(sigmoid_prime_element)
+    return tensor.map(sigmoid_prime_element);
 }
 
 
@@ -177,7 +177,7 @@ where
     T: Tensor,
     T::Element: From<f32>
 {
-    tensor.map(relu_prime_element)
+    return tensor.map(relu_prime_element);
 }
 
 

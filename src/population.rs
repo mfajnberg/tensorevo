@@ -42,7 +42,7 @@ impl<T: Tensor> Population<T>
     pub fn apply_selection(&mut self, species_key: String) 
     {
         let current_species = self.species.get(&species_key).unwrap();
-        let pairs = (self.kill_weak_and_select_parents)(&self, current_species);
+        let pairs = (self.kill_weak_and_select_parents)(self, current_species);
 
         let new_individuals: Vec<Individual<T>> = pairs.iter().map(
             |(parent1, parent2)| (self.procreate_pair)(parent1, parent2)

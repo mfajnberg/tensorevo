@@ -50,7 +50,7 @@ pub trait Tensor:
     type Element: TensorElement;  // associated type must implement the `TensorElement` trait
 
     /// Creates a Tensor from a Vec of TensorElements
-    fn from_vec(v: &Vec<Vec<Self::Element>>) -> Self;
+    fn from_vec(v: &[Vec<Self::Element>]) -> Self;
     
     /// Creates a Tensor from a json array of arrays of numbers
     // https://doc.rust-lang.org/book/ch10-02-traits.html#default-implementations
@@ -150,13 +150,12 @@ impl<TE: TensorElement> Serialize for NDTensor<TE> {
 impl<TE: TensorElement> Tensor for NDTensor<TE> {
     type Element = TE;
 
-    fn from_vec(v: &Vec<Vec<Self::Element>>) -> Self {
+    fn from_vec(v: &[Vec<Self::Element>]) -> Self {
         let mut data = Vec::new();
         let num_columns = v.first().map_or(0, |row| row.len());
-        let mut num_rows = 0;
-        for idx in 0..v.len() {
-            data.extend_from_slice(&v[idx]);
-            num_rows += 1;
+        let num_rows = v.len();
+        for row in v {
+            data.extend_from_slice(row);
         }
         let arr = Array2::from_shape_vec((num_rows, num_columns), data);
         return Self {data: arr.unwrap()};
@@ -176,7 +175,7 @@ impl<TE: TensorElement> Tensor for NDTensor<TE> {
     
     fn to_vec(&self) -> Vec<Vec<Self::Element>> {
         let mut output = Vec::<Vec<Self::Element>>::new();
-        for row in (&self.data).rows() {
+        for row in (self.data).rows() {
             output.push(row.to_vec());
         }
         return output;
@@ -229,7 +228,7 @@ impl<TE: TensorElement> Tensor for NDTensor<TE> {
 /// Allow printing `NDTensor` objects via `{}`
 impl<TE: TensorElement> Display for NDTensor<TE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", self.data)
+        return write!(f, "{}", self.data);
     }
 }
 
@@ -238,7 +237,7 @@ impl<TE: TensorElement> Display for NDTensor<TE> {
 impl<TE: TensorElement> Debug for NDTensor<TE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
 
-        write!(f, "{:?}", self.data)
+        return write!(f, "{:?}", self.data);
     }
 }
 
