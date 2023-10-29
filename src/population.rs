@@ -4,26 +4,21 @@ use crate::species::Species;
 use crate::individual::Individual;
 use crate::tensor::Tensor;
 
+
 type SelectFunc<T> = for<'a> fn(&Population<T>, &'a Species<T>) -> Vec<(&'a Individual<T>, &'a Individual<T>)>;
 type ProcreateFunc<T> = fn(&Individual<T>, &Individual<T>) -> Individual<T>;
 type DetermineSpeciesKey<T> = fn(&Individual<T>) -> String;
 
-pub struct Population<T: Tensor> 
-    where
-        T: Tensor,
-        T::Element: From<f32>,
-{
+
+pub struct Population<T: Tensor> {
     species: HashMap<String, Species<T>>,
     kill_weak_and_select_parents: SelectFunc<T>,
     procreate_pair: ProcreateFunc<T>, // crossover, mutation
     determine_species_key: DetermineSpeciesKey<T>,
 }
 
-impl<T: Tensor> Population<T> 
-    where
-        T: Tensor,
-        T::Element: From<f32>,
-{
+
+impl<T: Tensor> Population<T> {
     pub fn new(
         selection_function: SelectFunc<T>,
         procreation_function: ProcreateFunc<T>,

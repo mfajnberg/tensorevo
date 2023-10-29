@@ -5,7 +5,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::iter::Sum;
 
 use ndarray::{Array2, Axis};
-use num_traits::Float;
+use num_traits::{Float, FromPrimitive};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::DeserializeOwned;
 
@@ -19,20 +19,24 @@ pub trait TensorElement:
     + Display
     // https://docs.rs/num-traits/latest/num_traits/float/trait.Float.html
     + Float
+    // https://docs.rs/num-traits/latest/num_traits/cast/trait.FromPrimitive.html
+    + FromPrimitive
     + Serialize
     + Sum
 {}
 
 
 /// Generic implementation of the trait for any type that satisfies the `TensorElement` bounds:
-impl<N> TensorElement for N where
-    N: 'static
-        + Debug
-        + DeserializeOwned
-        + Display
-        + Float
-        + Serialize
-        + Sum
+impl<N> TensorElement for N
+where N:
+    'static
+    + Debug
+    + DeserializeOwned
+    + Display
+    + Float
+    + FromPrimitive
+    + Serialize
+    + Sum
 {}
 
 
@@ -131,7 +135,7 @@ pub struct NDTensor<TE: TensorElement> {
 
 /// Allows `serde` to deserialize to `NDTensor` objects.
 impl<'de, TE: TensorElement> Deserialize<'de> for NDTensor<TE> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         return deserialize_to_tensor(deserializer);
     }
 }
@@ -139,7 +143,7 @@ impl<'de, TE: TensorElement> Deserialize<'de> for NDTensor<TE> {
 
 /// Allows `serde` to serialize `NDTensor` objects.
 impl<TE: TensorElement> Serialize for NDTensor<TE> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let vec = &self.to_vec();
         return vec.serialize(serializer);
     }
@@ -253,31 +257,20 @@ impl<TE: TensorElement> PartialEq for NDTensor<TE> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ops::{Div, Mul};
 
-    fn double<N>(x: N) -> N
-    where N: Mul<Output =N> + TryFrom<u8> {
-        return x * N::try_from(2).unwrap_or_else(|_| unreachable!());
+    fn double<TE: TensorElement>(x: TE) -> TE {
+        return x * TE::from_usize(2).unwrap();
     }
-    
-    fn halve<N>(x: N) -> N
-    where N: Div<Output =N> + TryFrom<u8> {
-        return x / N::try_from(2).unwrap_or_else(|_| unreachable!());
+
+    fn halve<TE: TensorElement>(x: TE) -> TE {
+        return x / TE::from_usize(2).unwrap();
     }
-    
-    fn double_tensor<T>(tensor: &T) -> T
-    where
-        T: Tensor,
-        T::Element: TryFrom<u8>,
-    {
+
+    fn double_tensor<T: Tensor>(tensor: &T) -> T {
         return tensor.map(double);
     }
     
-    fn halve_tensor_inplace<T>(tensor: &mut T)
-    where
-        T: Tensor,
-        T::Element: TryFrom<u8>,
-    {
+    fn halve_tensor_inplace<T: Tensor>(tensor: &mut T) {
         tensor.map_inplace(halve)
     }
     

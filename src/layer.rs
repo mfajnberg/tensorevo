@@ -6,11 +6,7 @@ use crate::tensor::Tensor;
 
 #[derive(Deserialize, Serialize)]
 #[serde(bound = "")]
-pub struct Layer<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub struct Layer<T: Tensor> {
     pub weights: T,
     pub biases: T,
     #[serde(serialize_with = "serialize_activation")]
@@ -18,11 +14,7 @@ where
     pub activation: Activation<T>
 }
 
-impl<T> Layer<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+impl<T: Tensor> Layer<T> {
     pub fn feed_forward(&self, input: &T) -> (T, T) {
         let weighted_input = self.weights.dot(input).add(&self.biases);
         let activation = self.activation.call(&weighted_input);

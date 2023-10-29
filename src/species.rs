@@ -2,20 +2,12 @@ use crate::individual::Individual;
 use crate::tensor::Tensor;
 
 
-pub struct Species<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub struct Species<T: Tensor> {
     individuals: Vec<Individual<T>>
 }
 
 
-impl<T> Species<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+impl<T: Tensor> Species<T> {
     pub fn new() -> Self {
         return Self {
             individuals: Vec::new()
@@ -28,11 +20,7 @@ where
 }
 
 
-impl<T> Default for Species<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+impl<T: Tensor> Default for Species<T> {
     fn default() -> Self {
         return Species::new();
     }

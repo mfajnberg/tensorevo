@@ -4,10 +4,9 @@
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 
-use num_traits::{Float, NumCast};
 use serde::{Deserialize, Deserializer, Serializer};
 
-use crate::tensor::Tensor;
+use crate::tensor::{Tensor, TensorElement};
 
 
 /// Convenience struct to store an activation function together with its name and derivative.
@@ -23,11 +22,7 @@ pub struct Activation<T: Tensor> {
 
 
 /// Methods for convenient construction and calling.
-impl<T> Activation<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+impl<T: Tensor> Activation<T> {
     /// Hard-coded constructor for available activation functions.
     pub fn from_name(name: &str) -> Self {
         let function: fn(&T) -> T;
@@ -68,7 +63,6 @@ pub fn serialize_activation<S, T>(
 where
     S: Serializer,
     T: Tensor,
-    T::Element: From<f32>,
 {
     return serializer.serialize_str(&activation.name);
 }
@@ -81,7 +75,6 @@ pub fn deserialize_activation<'de, D, T>(deserializer: D) -> Result<Activation<T
 where
     D: Deserializer<'de>,
     T: Tensor,
-    T::Element: From<f32>,
 {
     let name = String::deserialize(deserializer)?;
     return Ok(Activation::from_name(name.as_str()));
@@ -91,11 +84,7 @@ where
 /// Reference implementation of the sigmoid activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid<T>(tensor: &T) -> T
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub fn sigmoid<T: Tensor>(tensor: &T) -> T {
     return tensor.map(sigmoid_element);
 }
 
@@ -103,21 +92,14 @@ where
 /// Reference implementation of the sigmoid activation function.
 ///
 /// Takes a tensor as input and mutates it in place.
-pub fn sigmoid_inplace<T>(tensor: &mut T)
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub fn sigmoid_inplace<T: Tensor>(tensor: &mut T) {
     tensor.map_inplace(sigmoid_element);
 }
 
 
 /// Sigmoid function for a scalar/number.
-pub fn sigmoid_element<N>(number: N) -> N
-where
-    N: Float + From<f32>
-{
-    let one = <N as NumCast>::from(1.).unwrap();
+pub fn sigmoid_element<TE: TensorElement>(number: TE) -> TE {
+    let one = TE::from_usize(1).unwrap();
     return one / (one + (-number).exp());
 }
 
@@ -125,21 +107,14 @@ where
 /// Reference implementation of the derivative of the sigmoid activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid_prime<T>(tensor: &T) -> T
-where
-    T: Tensor,
-    T::Element: From<f32>
-{
+pub fn sigmoid_prime<T: Tensor>(tensor: &T) -> T {
     return tensor.map(sigmoid_prime_element);
 }
 
 
 /// Derivative of the sigmoid function for a scalar/number.
-pub fn sigmoid_prime_element<N>(number: N) -> N
-where
-    N: Float + From<f32>
-{
-    let one = <N as NumCast>::from(1.).unwrap();
+pub fn sigmoid_prime_element<TE: TensorElement>(number: TE) -> TE {
+    let one = TE::from_usize(1).unwrap();
     return sigmoid_element(number) * (one - sigmoid_element(number));
 }
 
@@ -147,21 +122,14 @@ where
 /// Reference implementation of the Rectified Linear Unit (RELU) activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn relu<T>(tensor: &T) -> T
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub fn relu<T: Tensor>(tensor: &T) -> T {
     return tensor.map(relu_element);
 }
 
 
 /// Rectified Linear Unit (RELU) activation function for a scalar/number.
-pub fn relu_element<N>(number: N) -> N
-where
-    N: Float + From<f32>
-{
-    let zero = <N as NumCast>::from(0.).unwrap();
+pub fn relu_element<TE: TensorElement>(number: TE) -> TE {
+    let zero = TE::from_usize(0).unwrap();
     if number < zero {
         return zero;
     }
@@ -172,25 +140,16 @@ where
 /// Reference implementation of the derivative of the Rectified Linear Unit (RELU) activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn relu_prime<T>(tensor: &T) -> T
-where
-    T: Tensor,
-    T::Element: From<f32>
-{
+pub fn relu_prime<T: Tensor>(tensor: &T) -> T {
     return tensor.map(relu_prime_element);
 }
 
 
 /// Derivative of the Rectified Linear Unit (RELU) function for a scalar/number.
-pub fn relu_prime_element<N>(number: N) -> N
-where
-    N: Float + From<f32>
-{
-    let zero = <N as NumCast>::from(0.).unwrap();
-    if number < zero {
-        return zero;
-    }
-    return <N as NumCast>::from(1.).unwrap();
+pub fn relu_prime_element<TE: TensorElement>(number: TE) -> TE {
+    let zero = TE::from_usize(0).unwrap();
+    let one = TE::from_usize(1).unwrap();
+    return if number < zero { zero } else { one };
 }
 
 #[cfg(test)]

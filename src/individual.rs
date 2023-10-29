@@ -16,11 +16,7 @@ use crate::cost_function::{quadratic_cost_function, quadratic_cost_function_prim
 /// Derives the `Deserialize` and `Serialize` traits from `serde`.
 #[derive(Deserialize, Serialize)]
 #[serde(bound = "")]
-pub struct Individual<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+pub struct Individual<T: Tensor> {
     /// Layers of the neural network ordered from input to output layer.
     layers: Vec<Layer<T>>,
 
@@ -30,11 +26,7 @@ where
 }
 
 
-impl<T: Tensor> Individual<T>
-where
-    T: Tensor,
-    T::Element: From<f32>,
-{
+impl<T: Tensor> Individual<T> {
     /// Constructs a new individual from a vector of layers.
     ///
     /// Initial validation error is set to `None`.
