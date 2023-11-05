@@ -23,8 +23,7 @@ impl<T: Tensor> Population<T> {
         selection_function: SelectFunc<T>,
         procreation_function: ProcreateFunc<T>,
         determine_key_function: DetermineSpeciesKey<T>,
-    ) -> Self 
-    {
+    ) -> Self {
         return Population {
             species: HashMap::new(),
             kill_weak_and_select_parents: selection_function,
@@ -34,8 +33,7 @@ impl<T: Tensor> Population<T> {
     }
     
     // mutates sets of individuals within one species
-    pub fn apply_selection(&mut self, species_key: String) 
-    {
+    pub fn apply_selection(&mut self, species_key: String) {
         let current_species = self.species.get(&species_key).unwrap();
         let pairs = (self.kill_weak_and_select_parents)(self, current_species);
 

@@ -2,7 +2,11 @@
 //!
 //! The `Individual` is the centerpiece of the evolutionary process.
 
+use std::io;
+use std::fs::read_to_string;
+
 use num_traits::{ToPrimitive, NumCast};
+use serde_json;
 use serde::{Deserialize, Serialize};
 use log::trace;
 
@@ -25,6 +29,24 @@ pub struct Individual<T: Tensor> {
     // TODO: Cost function as a field?
 }
 
+#[derive(Debug)]
+enum LoadError {
+    IO(io::Error),
+    Deserialization(serde_json::Error),
+}
+
+impl From<io::Error> for LoadError {
+    fn from(err: io::Error) -> Self {
+        return LoadError::IO(err);
+    }
+}
+
+impl From<serde_json::Error> for LoadError {
+    fn from(err: serde_json::Error) -> Self {
+        return LoadError::Deserialization(err);
+    }
+}
+
 
 impl<T: Tensor> Individual<T> {
     /// Constructs a new individual from a vector of layers.
@@ -41,6 +63,11 @@ impl<T: Tensor> Individual<T> {
             layers, 
             error_validation: None,
         }
+    }
+
+    pub fn from_file(path: &str) -> Result<Self, LoadError> {
+        let contents = read_to_string(path)?;
+        return serde_json::from_str(contents.as_str())?;
     }
 
     /// Performs a full forward pass for a given input and returns the network's output.
@@ -159,23 +186,18 @@ impl<T: Tensor> Individual<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::BufReader;
-
     use super::*;
     use crate::activation::Activation;
     use crate::tensor::NDTensor;
 
     #[test]
     fn test_serde() {
-        let input = NDTensor::from_vec(&vec![vec![1.], vec![0.]]);
-        let mut file = File::open("models/in/individual0.json").unwrap();
-        let reader = BufReader::new(&file);
-        let individual: Individual<NDTensor<f32>> = serde_json::from_reader(reader).unwrap();
-        let output = individual.forward_pass(&input);
-        println!("{}", output);
-        file = File::create("models/out/individual0.json").unwrap();
-        serde_json::to_writer_pretty(&file, &individual).unwrap();
+        let individual = Individual::<NDTensor<f32>>::from_file("models/in/individual0.json1").unwrap();
+        // let mut file = File::open("models/in/individual0.json").unwrap();
+        // let reader = BufReader::new(&file);
+        // let individual: Individual<NDTensor<f32>> = serde_json::from_reader(reader).unwrap();
+        // file = File::create("models/out/individual0.json").unwrap();
+        // serde_json::to_writer_pretty(&file, &individual).unwrap();
     }
     
     #[test]
