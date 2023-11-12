@@ -13,6 +13,7 @@ num-traits = "*"
 log = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
+tempfile = "*"
 
 [lints.clippy]
 needless_return = "allow"
