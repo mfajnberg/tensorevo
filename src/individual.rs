@@ -17,8 +17,8 @@ use crate::cost_function::{quadratic_cost_function, quadratic_cost_function_prim
 
 /// Neural network with evolutionary methods.
 ///
-/// Derives the `Deserialize` and `Serialize` traits from `serde`.
-#[derive(Deserialize, Serialize)]
+/// Derives the `Deserialize` and `Serialize` traits from `serde`, as well as `PartialEq` and `Debug`.
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Individual<T: Tensor> {
     /// Layers of the neural network ordered from input to output layer.
@@ -30,7 +30,7 @@ pub struct Individual<T: Tensor> {
 }
 
 #[derive(Debug)]
-enum LoadError {
+pub enum LoadError {
     IO(io::Error),
     Deserialization(serde_json::Error),
 }
@@ -65,9 +65,16 @@ impl<T: Tensor> Individual<T> {
         }
     }
 
+    /// Load an individual from a json file
+    /// 
+    /// # Arguments
+    /// * `path` - path to the json file
+    /// Todo: Make generic to allow both `Path` and `&str` as input type
+    /// 
+    /// # Returns
+    /// A new `Individual` instance or a `LoadError`
     pub fn from_file(path: &str) -> Result<Self, LoadError> {
-        let contents = read_to_string(path)?;
-        return serde_json::from_str(contents.as_str())?;
+        return Ok(serde_json::from_str(read_to_string(path)?.as_str())?);
     }
 
     /// Performs a full forward pass for a given input and returns the network's output.
@@ -187,20 +194,56 @@ impl<T: Tensor> Individual<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use crate::activation::Activation;
     use crate::tensor::NDTensor;
+    use tempfile::NamedTempFile;
 
     #[test]
-    fn test_serde() {
-        let individual = Individual::<NDTensor<f32>>::from_file("models/in/individual0.json1").unwrap();
-        // let mut file = File::open("models/in/individual0.json").unwrap();
-        // let reader = BufReader::new(&file);
-        // let individual: Individual<NDTensor<f32>> = serde_json::from_reader(reader).unwrap();
-        // file = File::create("models/out/individual0.json").unwrap();
-        // serde_json::to_writer_pretty(&file, &individual).unwrap();
+    fn test_from_file() -> Result<(), LoadError> {
+        let individual_json = r#"{"layers":[{"weights":[[0,1],[2,3]],"biases":[[4],[5]],"activation":"sigmoid"},
+                                                {"weights":[[0,-1],[-2,-3]],"biases":[[-4],[-5]],"activation":"relu"}]}"#;
+        let individual_expected = Individual::new(
+            vec![
+                    Layer{
+                        weights: NDTensor::from_vec(
+                            &vec![
+                                vec![0., 1.],
+                                vec![2., 3.],
+                            ]
+                        ),
+                        biases: NDTensor::from_vec(
+                            &vec![
+                                vec![4.],
+                                vec![5.],
+                            ]
+                        ),
+                        activation: Activation::<NDTensor<f64>>::from_name("sigmoid"),
+                    },
+                    Layer{
+                        weights: NDTensor::from_vec(
+                            &vec![
+                                vec![0., -1.],
+                                vec![-2., -3.],
+                            ]
+                        ),
+                        biases: NDTensor::from_vec(
+                            &vec![
+                                vec![-4.],
+                                vec![-5.],
+                            ]
+                        ),
+                        activation: Activation::<NDTensor<f64>>::from_name("relu"),
+                    },
+                ]
+        );
+        let mut individual_file = NamedTempFile::new()?;
+        individual_file.write_all(individual_json.as_bytes())?;
+        let individual_loaded = Individual::<NDTensor<f64>>::from_file(individual_file.path().to_str().unwrap())?;
+        assert_eq!(individual_expected, individual_loaded);
+        return Ok(());
     }
     
-    #[test]
     fn test_sgd() {
         let mut individual = Individual::new(
             vec![

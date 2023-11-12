@@ -4,7 +4,7 @@ use crate::activation::{Activation, deserialize_activation, serialize_activation
 use crate::tensor::Tensor;
 
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Layer<T: Tensor> {
     pub weights: T,
