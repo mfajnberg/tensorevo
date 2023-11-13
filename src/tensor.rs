@@ -1,6 +1,5 @@
 //! Definitions of the `Tensor` and `TensorElement` trait and the `NDTensor` reference implementation.
 
-use std::cmp::PartialEq;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::iter::Sum;
 

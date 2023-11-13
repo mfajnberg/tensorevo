@@ -1,9 +1,6 @@
 //! Definition of the `Activation` struct and the most common activation functions as well as their
 //! derivatives.
 
-use std::cmp::{Eq, PartialEq};
-use std::fmt::Debug;
-
 use serde::{Deserialize, Deserializer, Serializer};
 
 use crate::tensor::{Tensor, TensorElement};
