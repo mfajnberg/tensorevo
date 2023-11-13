@@ -6,10 +6,11 @@ use std::fs::read_to_string;
 use std::io::Error as IOError;
 use std::path::Path;
 
+use log::trace;
 use num_traits::{ToPrimitive, NumCast};
 use serde_json;
 use serde::{Deserialize, Serialize};
-use log::trace;
+use thiserror::Error;
 
 use crate::layer::Layer;
 use crate::tensor::Tensor;
@@ -30,22 +31,13 @@ pub struct Individual<T: Tensor> {
     // TODO: Cost function as a field?
 }
 
-#[derive(Debug)]
+
+/// Error that may occur when trying to load an `Individual` instance from a file.
+#[derive(Debug, Error)]
+#[error(transparent)]
 pub enum LoadError {
-    IO(IOError),
-    Deserialization(serde_json::Error),
-}
-
-impl From<IOError> for LoadError {
-    fn from(err: IOError) -> Self {
-        return LoadError::IO(err);
-    }
-}
-
-impl From<serde_json::Error> for LoadError {
-    fn from(err: serde_json::Error) -> Self {
-        return LoadError::Deserialization(err);
-    }
+    IO(#[from] IOError),
+    Deserialization(#[from] serde_json::Error),
 }
 
 

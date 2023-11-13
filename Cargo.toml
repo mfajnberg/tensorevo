@@ -14,6 +14,7 @@ log = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 tempfile = "*"
+thiserror = "*"
 
 [lints.clippy]
 needless_return = "allow"
