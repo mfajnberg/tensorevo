@@ -9,6 +9,9 @@ use serde::{Deserialize, Deserializer, Serializer};
 use crate::tensor::{Tensor, TensorElement};
 
 
+type TFunc<T> = fn(&T) -> T;
+
+
 /// Convenience struct to store an activation function together with its name and derivative.
 ///
 /// This is used in the `Layer` struct.
@@ -16,15 +19,15 @@ use crate::tensor::{Tensor, TensorElement};
 #[derive(Debug, Eq, PartialEq)]
 pub struct Activation<T: Tensor> {
     name: String,
-    function: fn(&T) -> T,
-    derivative: fn(&T) -> T,
+    function: TFunc<T>,
+    derivative: TFunc<T>,
 }
 
 
 /// Methods for convenient construction and calling.
 impl<T: Tensor> Activation<T> {
     /// Basic constructor to manually define all fields.
-    pub fn new(name: &str, function: fn(&T) -> T, derivative: fn(&T) -> T) -> Self {
+    pub fn new(name: &str, function: TFunc<T>, derivative: TFunc<T>) -> Self {
         return Self{name: name.to_owned(), function, derivative}
     }
 
@@ -34,8 +37,8 @@ impl<T: Tensor> Activation<T> {
     /// - `sigmoid`
     /// - `relu`
     pub fn from_name(name: &str) -> Self {
-        let function: fn(&T) -> T;
-        let derivative: fn(&T) -> T;
+        let function: TFunc<T>;
+        let derivative: TFunc<T>;
         if name == "sigmoid" {
             (function, derivative) = (sigmoid, sigmoid_prime);
         } else if name == "relu" {
