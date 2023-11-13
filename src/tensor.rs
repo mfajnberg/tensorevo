@@ -133,6 +133,15 @@ pub struct NDTensor<TE: TensorElement> {
 }
 
 
+/// Custom `NDTensor`-specific methods not defined on the `Tensor` trait.
+impl<TE: TensorElement> NDTensor<TE> {
+    /// Simple constructor to directly pass the data as an `ndarray`.
+    pub fn new(data: Array2<TE>) -> Self {
+        return Self{data}
+    }
+}
+
+
 /// Allows `serde` to deserialize to `NDTensor` objects.
 impl<'de, TE: TensorElement> Deserialize<'de> for NDTensor<TE> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {

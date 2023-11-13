@@ -23,7 +23,16 @@ pub struct Activation<T: Tensor> {
 
 /// Methods for convenient construction and calling.
 impl<T: Tensor> Activation<T> {
-    /// Hard-coded constructor for available activation functions.
+    /// Basic constructor to manually define all fields.
+    pub fn new(name: &str, function: fn(&T) -> T, derivative: fn(&T) -> T) -> Self {
+        return Self{name: name.to_owned(), function, derivative}
+    }
+
+    /// Convenience constructor for known/available activation functions.
+    ///
+    /// Pre-defined functions are determined from hard-coded names:
+    /// - `sigmoid`
+    /// - `relu`
     pub fn from_name(name: &str) -> Self {
         let function: fn(&T) -> T;
         let derivative: fn(&T) -> T;

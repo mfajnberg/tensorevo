@@ -195,51 +195,39 @@ impl<T: Tensor> Individual<T> {
 mod tests {
     use super::*;
     use std::io::Write;
-    use crate::activation::Activation;
-    use crate::tensor::NDTensor;
+
+    use ndarray::array;
     use tempfile::NamedTempFile;
+
+    use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
+    use crate::tensor::NDTensor;
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
-        let individual_json = r#"{"layers":[{"weights":[[0,1],[2,3]],"biases":[[4],[5]],"activation":"sigmoid"},
-                                                {"weights":[[0,-1],[-2,-3]],"biases":[[-4],[-5]],"activation":"relu"}]}"#;
-        let individual_expected = Individual::new(
-            vec![
-                    Layer{
-                        weights: NDTensor::from_vec(
-                            &vec![
-                                vec![0., 1.],
-                                vec![2., 3.],
-                            ]
-                        ),
-                        biases: NDTensor::from_vec(
-                            &vec![
-                                vec![4.],
-                                vec![5.],
-                            ]
-                        ),
-                        activation: Activation::<NDTensor<f64>>::from_name("sigmoid"),
-                    },
-                    Layer{
-                        weights: NDTensor::from_vec(
-                            &vec![
-                                vec![0., -1.],
-                                vec![-2., -3.],
-                            ]
-                        ),
-                        biases: NDTensor::from_vec(
-                            &vec![
-                                vec![-4.],
-                                vec![-5.],
-                            ]
-                        ),
-                        activation: Activation::<NDTensor<f64>>::from_name("relu"),
-                    },
-                ]
-        );
+        let individual_json = r#"{"layers":[
+            {"weights":[[0,1],[2,3]],"biases":[[4],[5]],"activation":"sigmoid"},
+            {"weights":[[0,-1],[-2,-3]],"biases":[[-4],[-5]],"activation":"relu"}
+        ]}"#;
+        let individual_expected = Individual{
+            layers: vec![
+                Layer::new(
+                    NDTensor::new(array![[0., 1.], [2., 3.]]),
+                    NDTensor::new(array![[4.], [5.]]),
+                    Activation::new("sigmoid", sigmoid, sigmoid_prime),
+                ),
+                Layer::new(
+                    NDTensor::new(array![[0., -1.], [-2., -3.]]),
+                    NDTensor::new(array![[-4.], [-5.]]),
+                    Activation::new("relu", relu, relu_prime),
+                ),
+            ],
+            error_validation: None,
+        };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
-        let individual_loaded = Individual::<NDTensor<f64>>::from_file(individual_file.path().to_str().unwrap())?;
+        let individual_loaded = Individual::<NDTensor<f32>>::from_file(
+            individual_file.path().to_str().unwrap()
+        )?;
         assert_eq!(individual_expected, individual_loaded);
         return Ok(());
     }
