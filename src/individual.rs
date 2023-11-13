@@ -62,7 +62,6 @@ impl<T: Tensor> Individual<T> {
     /// 
     /// # Arguments
     /// * `path` - path to the json file
-    /// Todo: Make generic to allow both `Path` and `&str` as input type
     /// 
     /// # Returns
     /// A new `Individual` instance or a `LoadError`
