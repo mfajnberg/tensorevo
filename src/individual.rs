@@ -2,8 +2,9 @@
 //!
 //! The `Individual` is the centerpiece of the evolutionary process.
 
-use std::io;
 use std::fs::read_to_string;
+use std::io::Error as IOError;
+use std::path::Path;
 
 use num_traits::{ToPrimitive, NumCast};
 use serde_json;
@@ -31,12 +32,12 @@ pub struct Individual<T: Tensor> {
 
 #[derive(Debug)]
 pub enum LoadError {
-    IO(io::Error),
+    IO(IOError),
     Deserialization(serde_json::Error),
 }
 
-impl From<io::Error> for LoadError {
-    fn from(err: io::Error) -> Self {
+impl From<IOError> for LoadError {
+    fn from(err: IOError) -> Self {
         return LoadError::IO(err);
     }
 }
@@ -73,7 +74,7 @@ impl<T: Tensor> Individual<T> {
     /// 
     /// # Returns
     /// A new `Individual` instance or a `LoadError`
-    pub fn from_file(path: &str) -> Result<Self, LoadError> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LoadError> {
         return Ok(serde_json::from_str(read_to_string(path)?.as_str())?);
     }
 
@@ -225,9 +226,7 @@ mod tests {
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
-        let individual_loaded = Individual::<NDTensor<f32>>::from_file(
-            individual_file.path().to_str().unwrap()
-        )?;
+        let individual_loaded = Individual::<NDTensor<f32>>::from_file(individual_file.path())?;
         assert_eq!(individual_expected, individual_loaded);
         return Ok(());
     }
