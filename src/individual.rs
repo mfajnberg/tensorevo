@@ -29,6 +29,7 @@ pub struct Individual<T: Tensor> {
     /// Latest cost calculated from a validation dataset.
     error_validation: Option<f32>,
     // TODO: Cost function as a field?
+    //       https://github.com/mfajnberg/tensorevo/issues/1
 }
 
 
@@ -99,7 +100,8 @@ impl<T: Tensor> Individual<T> {
     ///
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
-    // TODO: Refactor if possible
+    // TODO: Refactor if possible.
+    //       https://github.com/mfajnberg/tensorevo/issues/2
     fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T) -> (Vec<T>, Vec<T>) {
         let num_layers = self.layers.len();
         let mut nabla_weights = Vec::<T>::new();
@@ -157,7 +159,8 @@ impl<T: Tensor> Individual<T> {
                 &biases_update_factor.hadamard(&nabla_biases[idx])
             );
         }
-        // TODO: Calculate validation error here instead of in `sgd`
+        // TODO: Calculate validation error here instead of in `sgd`.
+        //       https://github.com/mfajnberg/tensorevo/issues/4
     }
 
     pub fn stochastic_gradient_descent(
@@ -176,7 +179,9 @@ impl<T: Tensor> Individual<T> {
                 None => {},
                 Some((input, desired_output)) => {
                     let output = self.forward_pass(input);
-                    self.error_validation = Some(quadratic_cost_function(&output, desired_output)) // todo: update_error()
+                    self.error_validation = Some(quadratic_cost_function(&output, desired_output))
+                    // TODO: update_error().
+                    //       https://github.com/mfajnberg/tensorevo/issues/3
                 }
             }
         }

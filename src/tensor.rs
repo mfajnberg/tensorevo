@@ -49,6 +49,8 @@ pub trait Tensor:
     + PartialEq
     + Serialize
     + Sized
+    // TODO: Add all relevant operator overloading traits from `std::ops`.
+    //       https://github.com/mfajnberg/tensorevo/issues/5
 {
     type Element: TensorElement;  // associated type must implement the `TensorElement` trait
 
