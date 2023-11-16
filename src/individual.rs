@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::layer::Layer;
 use crate::tensor::Tensor;
-use crate::cost_function::{quadratic_cost_function, quadratic_cost_function_prime};
+use crate::cost_function::{CostFunction, serialize_cost_function, deserialize_cost_function};
 
 
 /// Neural network with evolutionary methods.
@@ -28,8 +28,12 @@ pub struct Individual<T: Tensor> {
 
     /// Latest cost calculated from a validation dataset.
     error_validation: Option<f32>,
-    // TODO: Cost function as a field?
-    //       https://github.com/mfajnberg/tensorevo/issues/1
+
+    /// Cost function used to calculate the error.
+    #[serde(serialize_with = "serialize_cost_function")]
+    #[serde(deserialize_with = "deserialize_cost_function")]
+    #[serde(default = "CostFunction::default")]
+    cost_function: CostFunction<T>,
 }
 
 
@@ -49,13 +53,15 @@ impl<T: Tensor> Individual<T> {
     ///
     /// # Arguments
     /// * `layers` - vector of `Layer` structs ordered from input to output layer
+    /// * `cost_function` - self explanatory
     ///
     /// # Returns
     /// New `Individual` with the given layers
-    pub fn new(layers: Vec<Layer<T>>) -> Self {
+    pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
         return Individual { 
             layers, 
             error_validation: None,
+            cost_function,
         }
     }
 
@@ -122,7 +128,7 @@ impl<T: Tensor> Individual<T> {
             activations.push(activation.clone());
         }
         // Go backwards
-        let cost_derivative = quadratic_cost_function_prime(&activation, batch_desired_outputs);
+        let cost_derivative = self.cost_function.call_derivative(&activation, batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
         let mut delta = cost_derivative.hadamard(&self.layers[num_layers - 1].activation.call_derivative(weighted_input));
         nabla_weights[num_layers - 1] = delta.dot(&activations[num_layers - 2].transpose());
@@ -179,7 +185,7 @@ impl<T: Tensor> Individual<T> {
                 None => {},
                 Some((input, desired_output)) => {
                     let output = self.forward_pass(input);
-                    self.error_validation = Some(quadratic_cost_function(&output, desired_output))
+                    self.error_validation = Some(self.cost_function.call(&output, desired_output))
                     // TODO: update_error().
                     //       https://github.com/mfajnberg/tensorevo/issues/3
                 }
@@ -197,6 +203,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
+    use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
     use crate::tensor::NDTensor;
 
     #[test]
@@ -219,6 +226,7 @@ mod tests {
                 ),
             ],
             error_validation: None,
+            cost_function: CostFunction::new("quadratic", quadratic, quadratic_prime),
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
@@ -260,7 +268,8 @@ mod tests {
                     ),
                     activation: Activation::<NDTensor<f64>>::from_name("relu"),
                 },
-            ]
+            ],
+            CostFunction::from_name("quadratic"),
         );
         let input1 = NDTensor::from_vec(
             &vec![
