@@ -1,0 +1,45 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.rs'
+      - '.github/workflows/*'
+      - 'Cargo.toml'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    paths:
+      - '**.rs'
+      - '.github/workflows/*'
+      - 'Cargo.toml'
+
+jobs:
+  unit-test-coverage:
+    name: Unit test coverage
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run tests and calculate code coverage
+        run: cargo llvm-cov --json --summary-only | jq '.' > coverage.json
+
+      - name: Upload code coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report
+          path: coverage.json
+          retention-days: 7
+
+      - name: Print total line coverage
+        run: jq '.["data"][0]["totals"]["lines"]["percent"]' coverage.json
