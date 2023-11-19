@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::layer::Layer;
 use crate::tensor::Tensor;
-use crate::cost_function::{CostFunction, serialize_cost_function, deserialize_cost_function};
+use crate::cost_function::CostFunction;
 
 
 /// Neural network with evolutionary methods.
@@ -30,8 +30,6 @@ pub struct Individual<T: Tensor> {
     error_validation: Option<f32>,
 
     /// Cost function used to calculate the error.
-    #[serde(serialize_with = "serialize_cost_function")]
-    #[serde(deserialize_with = "deserialize_cost_function")]
     #[serde(default = "CostFunction::default")]
     cost_function: CostFunction<T>,
 }

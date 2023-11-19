@@ -1,7 +1,7 @@
 //! Definition of the `Activation` struct and the most common activation functions as well as their
 //! derivatives.
 
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::tensor::{Tensor, TensorElement};
 
@@ -62,31 +62,20 @@ impl<T: Tensor> Activation<T> {
 }
 
 
-/// Serializes an `Activation` object using a `serde::Serializer`.
-///
-/// Used in the `Layer` struct to serialize its `activation` field.
-pub fn serialize_activation<S, T>(
-    activation: &Activation<T>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-    T: Tensor,
-{
-    return serializer.serialize_str(&activation.name);
+/// Allows `serde` to serialize `Activation` objects.
+impl<T: Tensor> Serialize for Activation<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        return serializer.serialize_str(&self.name);
+    }
 }
 
 
-/// Deserializes from a `serde::Deserializer` to an `Activation` object.
-///
-/// Used in the `Layer` struct to deserialize to its `activation` field.
-pub fn deserialize_activation<'de, D, T>(deserializer: D) -> Result<Activation<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Tensor,
-{
-    let name = String::deserialize(deserializer)?;
-    return Ok(Activation::from_name(name.as_str()));
+/// Allows `serde` to deserialize to `Activation` objects.
+impl<'de, T: Tensor> Deserialize<'de> for Activation<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        return Ok(Self::from_name(name.as_str()));
+    }
 }
 
 

@@ -2,7 +2,7 @@
 //! derivatives.
 
 use num_traits::ToPrimitive;
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::tensor::Tensor;
 
@@ -68,31 +68,20 @@ impl<T: Tensor> Default for CostFunction<T> {
 }
 
 
-/// Serializes a `CostFunction` object using a `serde::Serializer`.
-///
-/// Used in the `Individual` struct to serialize its `cost_function` field.
-pub fn serialize_cost_function<S, T>(
-    cost_function: &CostFunction<T>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-    T: Tensor,
-{
-    return serializer.serialize_str(&cost_function.name);
+/// Allows `serde` to serialize `CostFunction` objects.
+impl<T: Tensor> Serialize for CostFunction<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        return serializer.serialize_str(&self.name);
+    }
 }
 
 
-/// Deserializes from a `serde::Deserializer` to an `CostFunction` object.
-///
-/// Used in the `Individual` struct to deserialize to its `cost_function` field.
-pub fn deserialize_cost_function<'de, D, T>(deserializer: D) -> Result<CostFunction<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Tensor,
-{
-    let name = String::deserialize(deserializer)?;
-    return Ok(CostFunction::from_name(name.as_str()));
+/// Allows `serde` to deserialize to `CostFunction` objects.
+impl<'de, T: Tensor> Deserialize<'de> for CostFunction<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        return Ok(Self::from_name(name.as_str()));
+    }
 }
 
 

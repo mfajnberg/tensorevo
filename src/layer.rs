@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::activation::{Activation, deserialize_activation, serialize_activation};
+use crate::activation::Activation;
 use crate::tensor::Tensor;
 
 
@@ -9,8 +9,6 @@ use crate::tensor::Tensor;
 pub struct Layer<T: Tensor> {
     pub weights: T,
     pub biases: T,
-    #[serde(serialize_with = "serialize_activation")]
-    #[serde(deserialize_with = "deserialize_activation")]
     pub activation: Activation<T>
 }
 
