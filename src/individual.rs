@@ -145,6 +145,15 @@ impl<T: Tensor> Individual<T> {
         return (nabla_biases, nabla_weights);
     }
 
+    /// Updates the weights and biases of the individual, 
+    /// given a single batch of inputs and corresponding desired outputs.
+    ///
+    /// # Arguments
+    /// * `batch_inputs` - 2D-tensor where each column is an input sample.
+    /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
+    ///                             for each input sample/column in the `batch_inputs` tensor.
+    /// * `update_factor` - The learning rate divided by the batch size.
+    ///                     Adjusts the rate of change to the individual's weights and biases.
     pub fn stochastic_gradient_descent_step(
         &mut self,
         batch_inputs: &T,
@@ -167,6 +176,15 @@ impl<T: Tensor> Individual<T> {
         //       https://github.com/mfajnberg/tensorevo/issues/4
     }
 
+    /// Updates the weights and biases of the individual, given an entire vector of training data.
+    /// Also updates the individual's error, if validation data is passed in as well.
+    ///
+    /// # Arguments
+    /// * `training_data` - Vector of tuples of two Tensors each, where the first one is a batch of inputs,
+    ///                     and the second one is a corresponding batch of output data.
+    /// * `validation_data` - An optional tuple of validation inputs and outputs.
+    ///                       Used to update the individual's error_validation performance indicator after training.
+    /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     pub fn stochastic_gradient_descent(
         &mut self,
         training_data: &Vec<(T, T)>,
