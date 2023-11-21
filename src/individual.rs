@@ -106,15 +106,7 @@ impl<T: Tensor> Individual<T> {
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
     // TODO: Refactor if possible.
     //       https://github.com/mfajnberg/tensorevo/issues/2
-    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T) -> (Vec<T>, Vec<T>) {
-        let num_layers = self.layers.len();
-        let mut nabla_weights = Vec::<T>::new();
-        let mut nabla_biases = Vec::<T>::new();
-        for layer in &self.layers {
-            nabla_weights.push(T::zeros(layer.weights.shape()));
-            nabla_biases.push(T::zeros(layer.biases.shape()));
-        }
-        // Feed forward and save weighted inputs and activations for each layer:
+    fn full_forward_pass(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
         let mut weighted_inputs = Vec::<T>::new();
         let mut activation: T = batch_inputs.clone();
         let mut activations = Vec::<T>::new();
@@ -125,8 +117,36 @@ impl<T: Tensor> Individual<T> {
             weighted_inputs.push(weighted_input);
             activations.push(activation.clone());
         }
+        return (weighted_inputs, activations)
+    }
+
+    /// Performs backpropagation with a given batch of inputs and desired outputs.
+    ///
+    /// Based on the book
+    /// [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/chap2.html)
+    /// by Michael Nielsen
+    ///
+    /// # Arguments
+    /// * `batch_inputs` - 2D-tensor where each column is an input sample.
+    ///                    Therefore the number of rows must match the number of input neurons.
+    /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
+    ///                             for each input sample/column in the `batch_inputs` tensor.
+    ///
+    /// # Returns
+    /// The gradient of the cost function parameterized by the given inputs and desired outputs.
+    // TODO: Refactor if possible.
+    //       https://github.com/mfajnberg/tensorevo/issues/2
+    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T, weighted_inputs: Vec<T>, activations: Vec<T>) -> (Vec<T>, Vec<T>) {
+        let num_layers = self.layers.len();
+        let mut nabla_weights = Vec::<T>::new();
+        let mut nabla_biases = Vec::<T>::new();
+        for layer in &self.layers {
+            nabla_weights.push(T::zeros(layer.weights.shape()));
+            nabla_biases.push(T::zeros(layer.biases.shape()));
+        }
         // Go backwards
-        let cost_derivative = self.cost_function.call_derivative(&activation, batch_desired_outputs);
+        let last_activation: &T = activations.last().unwrap();
+        let cost_derivative = self.cost_function.call_derivative(&last_activation, batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
         let mut delta = cost_derivative.hadamard(&self.layers[num_layers - 1].activation.call_derivative(weighted_input));
         nabla_weights[num_layers - 1] = delta.dot(&activations[num_layers - 2].transpose());
@@ -161,7 +181,8 @@ impl<T: Tensor> Individual<T> {
         update_factor: T::Element,
     ) {
         let num_layers = self.layers.len();
-        let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs);
+        let (weighted_inputs, activations) = self.full_forward_pass(batch_inputs);
+        let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs, weighted_inputs, activations);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
             self.layers[idx].weights = self.layers[idx].weights.sub(
