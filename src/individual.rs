@@ -90,23 +90,15 @@ impl<T: Tensor> Individual<T> {
         return output;
     }
 
-    /// Performs backpropagation with a given batch of inputs and desired outputs.
-    ///
-    /// Based on the book
-    /// [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/chap2.html)
-    /// by Michael Nielsen
+    /// Performs a forward pass given an entire batch of inputs.
     ///
     /// # Arguments
     /// * `batch_inputs` - 2D-tensor where each column is an input sample.
     ///                    Therefore the number of rows must match the number of input neurons.
-    /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
-    ///                             for each input sample/column in the `batch_inputs` tensor.
-    ///
+    /// 
     /// # Returns
-    /// The gradient of the cost function parameterized by the given inputs and desired outputs.
-    // TODO: Refactor if possible.
-    //       https://github.com/mfajnberg/tensorevo/issues/2
-    fn full_forward_pass(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
+    /// The resulting weighted inputs and activations to be used during backpropagation.
+    fn batch_forward_pass(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
         let mut weighted_inputs = Vec::<T>::new();
         let mut activation: T = batch_inputs.clone();
         let mut activations = Vec::<T>::new();
@@ -128,14 +120,15 @@ impl<T: Tensor> Individual<T> {
     ///
     /// # Arguments
     /// * `batch_inputs` - 2D-tensor where each column is an input sample.
-    ///                    Therefore the number of rows must match the number of input neurons.
     /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
     ///                             for each input sample/column in the `batch_inputs` tensor.
-    ///
+    /// * `weighted_inputs` - Vector of 2D-tensors returned along with the `activations` argument from
+    ///                       calling `batch_forward_pass` with the same input data.
+    /// * `activations` - The structure of both this and the `weighted_inputs` vector is such that
+    ///                   each element of a given index represents a point in a time series.
+    /// 
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
-    // TODO: Refactor if possible.
-    //       https://github.com/mfajnberg/tensorevo/issues/2
     fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T, weighted_inputs: Vec<T>, activations: Vec<T>) -> (Vec<T>, Vec<T>) {
         let num_layers = self.layers.len();
         let mut nabla_weights = Vec::<T>::new();
@@ -181,7 +174,7 @@ impl<T: Tensor> Individual<T> {
         update_factor: T::Element,
     ) {
         let num_layers = self.layers.len();
-        let (weighted_inputs, activations) = self.full_forward_pass(batch_inputs);
+        let (weighted_inputs, activations) = self.batch_forward_pass(batch_inputs);
         let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs, weighted_inputs, activations);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
