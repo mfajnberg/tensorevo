@@ -130,7 +130,7 @@ impl<T: Tensor> Individual<T> {
     /// 
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
-    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T, weighted_inputs: Vec<T>, activations: Vec<T>) -> (Vec<T>, Vec<T>) {
+    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T, weighted_inputs: Vec<T>, activations: Vec<T>,) -> (Vec<T>, Vec<T>) {
         let num_layers = self.layers.len();
         let mut nabla_weights = Vec::<T>::new();
         let mut nabla_biases = Vec::<T>::new();
@@ -168,11 +168,13 @@ impl<T: Tensor> Individual<T> {
     ///                             for each input sample/column in the `batch_inputs` tensor.
     /// * `update_factor` - The learning rate divided by the batch size.
     ///                     Adjusts the rate of change to the individual's weights and biases.
+    /// * `validation_data` - An optional tuple of validation inputs and outputs used to update the model's error score.
     pub fn stochastic_gradient_descent_step(
         &mut self,
         batch_inputs: &T,
         batch_desired_outputs: &T,
         update_factor: T::Element,
+        validation_data: Option<(&T, &T)>,
     ) {
         let num_layers = self.layers.len();
         let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
@@ -188,8 +190,9 @@ impl<T: Tensor> Individual<T> {
                 &biases_update_factor.hadamard(&nabla_biases[idx])
             );
         }
-        // TODO: Calculate validation error here instead of in `sgd`.
-        //       https://github.com/mfajnberg/tensorevo/issues/4
+        validation_data.map(|(input, desired_output)| 
+            self.error_validation = Some(self.calculate_error(input, desired_output))
+        );
     }
 
     /// Updates the weights and biases of the individual, given an entire vector of training data.
@@ -198,27 +201,21 @@ impl<T: Tensor> Individual<T> {
     /// # Arguments
     /// * `training_data` - Vector of tuples of two Tensors each, where the first one is a batch of inputs,
     ///                     and the second one is a corresponding batch of output data.
-    /// * `validation_data` - An optional tuple of validation inputs and outputs.
-    ///                       Used to update the individual's error_validation performance indicator after training.
+    /// * `validation_data` - An optional tuple of validation inputs and outputs passed onward to 
+    ///                       `stochastic_gradient_descent_step` where it's used to update `self.error_validation`
     /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     pub fn stochastic_gradient_descent(
         &mut self,
         training_data: &Vec<(T, T)>,
-        validation_data: Option<(&T, &T)>,
         learning_rate: f32,
+        validation_data: Option<(&T, &T)>,
     ) {
         let (_, batch_size) = training_data[0].0.shape();
         let update_factor = <T::Element as NumCast>::from(learning_rate / batch_size.to_f32().unwrap()).unwrap();
         let num_batches = training_data.len();
         for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
             trace!("batch: {}/{}", i+1, num_batches);
-            self.stochastic_gradient_descent_step(batch_inputs, batch_desired_outputs, update_factor);
-            match validation_data {
-                None => {},
-                Some((input, desired_output)) => {
-                    self.error_validation = Some(self.calculate_error(input, desired_output));
-                }
-            }
+            self.stochastic_gradient_descent_step(batch_inputs, batch_desired_outputs, update_factor, validation_data);
         }
     }
 
@@ -230,7 +227,7 @@ impl<T: Tensor> Individual<T> {
     /// 
     /// # Returns
     /// The error value
-    pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
+    pub fn calculate_error(&self, input: &T, desired_output: &T,) -> f32 {
         let output = self.forward_pass(input);
         return self.cost_function.call(&output, desired_output);
     }
