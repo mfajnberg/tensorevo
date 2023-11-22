@@ -90,15 +90,15 @@ impl<T: Tensor> Individual<T> {
         return output;
     }
 
-    /// Performs a forward pass given an entire batch of inputs.
+    /// Passes an entire batch of inputs to the model to get certain intermediate training data for backprop.
     ///
     /// # Arguments
     /// * `batch_inputs` - 2D-tensor where each column is an input sample.
     ///                    Therefore the number of rows must match the number of input neurons.
     /// 
     /// # Returns
-    /// The resulting weighted inputs and activations to be used during backpropagation.
-    fn batch_forward_pass(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
+    /// Two vectors of 2d-tensors of intermediate training data.
+    fn get_weighted_inputs_and_activations(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
         let mut weighted_inputs = Vec::<T>::new();
         let mut activation: T = batch_inputs.clone();
         let mut activations = Vec::<T>::new();
@@ -109,7 +109,7 @@ impl<T: Tensor> Individual<T> {
             weighted_inputs.push(weighted_input);
             activations.push(activation.clone());
         }
-        return (weighted_inputs, activations)
+        return (weighted_inputs, activations);
     }
 
     /// Performs backpropagation with a given batch of inputs and desired outputs.
@@ -123,9 +123,10 @@ impl<T: Tensor> Individual<T> {
     /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
     ///                             for each input sample/column in the `batch_inputs` tensor.
     /// * `weighted_inputs` - Vector of 2D-tensors returned along with the `activations` argument from
-    ///                       calling `batch_forward_pass` with the same input data.
-    /// * `activations` - The structure of both this and the `weighted_inputs` vector is such that
-    ///                   each element of a given index represents a point in a time series.
+    ///                       calling `get_weighted_inputs_and_activations` with the same input data.
+    /// * `activations` - Both this and the `weighted_inputs` are vectors where each element is a 2d-tensor 
+    ///                   containing one batch of intermediate training data corresponding to one layer, 
+    ///                   where in turn each column of those 2d-tensors represents one sample.
     /// 
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
@@ -174,8 +175,9 @@ impl<T: Tensor> Individual<T> {
         update_factor: T::Element,
     ) {
         let num_layers = self.layers.len();
-        let (weighted_inputs, activations) = self.batch_forward_pass(batch_inputs);
-        let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs, weighted_inputs, activations);
+        let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
+        let (nabla_biases, nabla_weights) = self.backprop(
+            batch_inputs, batch_desired_outputs, weighted_inputs, activations);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
             self.layers[idx].weights = self.layers[idx].weights.sub(
@@ -214,13 +216,23 @@ impl<T: Tensor> Individual<T> {
             match validation_data {
                 None => {},
                 Some((input, desired_output)) => {
-                    let output = self.forward_pass(input);
-                    self.error_validation = Some(self.cost_function.call(&output, desired_output))
-                    // TODO: update_error().
-                    //       https://github.com/mfajnberg/tensorevo/issues/3
+                    self.error_validation = Some(self.calculate_error(input, desired_output));
                 }
             }
         }
+    }
+
+    /// Calculates the model's error given some input and desired output.
+    /// 
+    /// # Arguments
+    /// * `input` - Tensor with a shape that matches the first/input layer
+    /// * `desired_output` - The desired output for the given input data
+    /// 
+    /// # Returns
+    /// The error value
+    pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
+        let output = self.forward_pass(input);
+        return self.cost_function.call(&output, desired_output);
     }
 }
 
