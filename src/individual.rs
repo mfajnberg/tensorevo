@@ -26,9 +26,6 @@ pub struct Individual<T: Tensor> {
     /// Layers of the neural network ordered from input to output layer.
     layers: Vec<Layer<T>>,
 
-    /// Latest cost calculated from a validation dataset.
-    error_validation: Option<f32>,
-
     /// Cost function used to calculate the error.
     #[serde(default = "CostFunction::default")]
     cost_function: CostFunction<T>,
@@ -58,7 +55,6 @@ impl<T: Tensor> Individual<T> {
     pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
         return Individual { 
             layers, 
-            error_validation: None,
             cost_function,
         }
     }
@@ -122,15 +118,11 @@ impl<T: Tensor> Individual<T> {
     /// * `batch_inputs` - 2D-tensor where each column is an input sample.
     /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
     ///                             for each input sample/column in the `batch_inputs` tensor.
-    /// * `weighted_inputs` - Vector of 2D-tensors returned along with the `activations` argument from
-    ///                       calling `get_weighted_inputs_and_activations` with the same input data.
-    /// * `activations` - Both this and the `weighted_inputs` are vectors where each element is a 2d-tensor 
-    ///                   containing one batch of intermediate training data corresponding to one layer, 
-    ///                   where in turn each column of those 2d-tensors represents one sample.
     /// 
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs.
-    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T, weighted_inputs: Vec<T>, activations: Vec<T>,) -> (Vec<T>, Vec<T>) {
+    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T,) -> (Vec<T>, Vec<T>) {
+        let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
         let num_layers = self.layers.len();
         let mut nabla_weights = Vec::<T>::new();
         let mut nabla_biases = Vec::<T>::new();
@@ -177,9 +169,8 @@ impl<T: Tensor> Individual<T> {
         validation_data: Option<(&T, &T)>,
     ) {
         let num_layers = self.layers.len();
-        let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
         let (nabla_biases, nabla_weights) = self.backprop(
-            batch_inputs, batch_desired_outputs, weighted_inputs, activations);
+            batch_inputs, batch_desired_outputs);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
             self.layers[idx].weights = self.layers[idx].weights.sub(
@@ -191,7 +182,7 @@ impl<T: Tensor> Individual<T> {
             );
         }
         validation_data.map(|(input, desired_output)| 
-            self.error_validation = Some(self.calculate_error(input, desired_output))
+            trace!("validation error: {}", Some(self.calculate_error(input, desired_output)))
         );
     }
 
@@ -264,7 +255,6 @@ mod tests {
                     Activation::new("relu", relu, relu_prime),
                 ),
             ],
-            error_validation: None,
             cost_function: CostFunction::new("quadratic", quadratic, quadratic_prime),
         };
         let mut individual_file = NamedTempFile::new()?;
