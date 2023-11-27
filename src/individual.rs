@@ -135,16 +135,16 @@ impl<T: Tensor> Individual<T> {
         let cost_derivative = self.cost_function.call_derivative(&last_activation, batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
         let mut delta = &cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
-        nabla_weights[num_layers - 1] = delta.dot(&activations[num_layers - 2].transpose());
+        nabla_weights[num_layers - 1] = delta.dot(activations[num_layers - 2].transpose());
         nabla_biases[num_layers - 1] = delta.sum_axis(1);
         for layer_num in (0..num_layers - 1).rev() {
             let weighted_input = &weighted_inputs[layer_num];
             let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
-            delta = &self.layers[layer_num + 1].weights.transpose().dot(&delta) * &sp;
+            delta = &self.layers[layer_num + 1].weights.transpose().dot(delta) * &sp;
             if layer_num > 0 {
-                nabla_weights[layer_num] = delta.dot(&activations[layer_num - 1].transpose());
+                nabla_weights[layer_num] = delta.dot(activations[layer_num - 1].transpose());
             } else { // activation of input layer == input
-                nabla_weights[layer_num] = delta.dot(&batch_inputs.transpose());
+                nabla_weights[layer_num] = delta.dot(batch_inputs.transpose());
             }
             nabla_biases[layer_num] = delta.sum_axis(1);
         }
