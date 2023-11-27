@@ -4,7 +4,7 @@
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::tensor::TensorBase;
+use crate::tensor::TensorOp;
 
 
 type TFunc<T> = fn(&T, &T) -> f32;
@@ -16,7 +16,7 @@ type TFuncPrime<T> = fn(&T, &T) -> T;
 /// This is used in the `Individual` struct.
 /// Facilitates (de-)serialization.
 #[derive(Debug, Eq, PartialEq)]
-pub struct CostFunction<T: TensorBase> {
+pub struct CostFunction<T: TensorOp> {
     name: String,
     function: TFunc<T>,
     derivative: TFuncPrime<T>,
@@ -24,7 +24,7 @@ pub struct CostFunction<T: TensorBase> {
 
 
 /// Methods for convenient construction and calling.
-impl<T: TensorBase> CostFunction<T> {
+impl<T: TensorOp> CostFunction<T> {
     /// Basic constructor to manually define all fields.
     pub fn new(name: &str, function: TFunc<T>, derivative: TFuncPrime<T>) -> Self {
         return Self{name: name.to_owned(), function, derivative}
@@ -61,7 +61,7 @@ impl<T: TensorBase> CostFunction<T> {
 }
 
 
-impl<T: TensorBase> Default for CostFunction<T> {
+impl<T: TensorOp> Default for CostFunction<T> {
     fn default() -> Self {
         return CostFunction::from_name("quadratic");
     }
@@ -69,7 +69,7 @@ impl<T: TensorBase> Default for CostFunction<T> {
 
 
 /// Allows `serde` to serialize `CostFunction` objects.
-impl<T: TensorBase> Serialize for CostFunction<T> {
+impl<T: TensorOp> Serialize for CostFunction<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         return serializer.serialize_str(&self.name);
     }
@@ -77,7 +77,7 @@ impl<T: TensorBase> Serialize for CostFunction<T> {
 
 
 /// Allows `serde` to deserialize to `CostFunction` objects.
-impl<'de, T: TensorBase> Deserialize<'de> for CostFunction<T> {
+impl<'de, T: TensorOp> Deserialize<'de> for CostFunction<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let name = String::deserialize(deserializer)?;
         return Ok(Self::from_name(name.as_str()));
@@ -97,11 +97,12 @@ impl<'de, T: TensorBase> Deserialize<'de> for CostFunction<T> {
 ///
 /// # Returns
 /// The cost as 32 bit float.
-pub fn quadratic<T: TensorBase>(
+pub fn quadratic<T: TensorOp>(
     output: &T,
     desired_output: &T,
 ) -> f32 {
-    return desired_output.sub(output).vec_norm().to_f32().unwrap() / 2.
+    // return desired_output.sub(output).vec_norm().to_f32().unwrap() / 2.
+    return (desired_output - output).vec_norm().to_f32().unwrap() / 2.
 }
 
 
@@ -116,9 +117,10 @@ pub fn quadratic<T: TensorBase>(
 ///
 /// # Returns
 /// Another tensor.
-pub fn quadratic_prime<T: TensorBase>(
+pub fn quadratic_prime<T: TensorOp>(
     output: &T,
     desired_output: &T,
 ) -> T {
-    return output.sub(desired_output)
+    // return output.sub(desired_output)
+    return output - desired_output
 }

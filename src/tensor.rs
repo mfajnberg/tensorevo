@@ -75,7 +75,7 @@ pub trait TensorBase:
     fn transpose(&self) -> Self;
 
     /// Returns a new tensor that is the difference between itself and another tensor
-    fn sub(&self, other: &Self) -> Self;
+    // fn sub(&self, other: &Self) -> Self;
 
     /// Returns a new tensor that is the dot product of itself and another tensor
     fn dot(&self, other: &Self) -> Self;
@@ -111,8 +111,8 @@ pub trait TensorOp =
     // Dot<Self> +
     where for<'a> &'a Self:
         ops::Add<Output = Self> +
-        // ops::Mul<Output = Self> +
-        // ops::Sub<Output = Self>
+        ops::Mul<Output = Self> +
+        ops::Sub<Output = Self>
 ;
 
 
@@ -212,9 +212,9 @@ impl<TE: TensorElement> TensorBase for NDTensor<TE> {
         return Self {data: self.data.t().to_owned()}
     }
 
-    fn sub(&self, other: &Self) -> Self {
-        return Self {data: &self.data - &other.data};
-    }
+    // fn sub(&self, other: &Self) -> Self {
+    //     return Self {data: &self.data - &other.data};
+    // }
 
     fn dot(&self, other: &Self) -> Self {
         return Self {data: self.data.dot(&other.data)};
@@ -261,8 +261,28 @@ impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
 }
 
 
+impl<TE: TensorElement> ops::Mul for &NDTensor<TE> {
+    type Output = NDTensor<TE>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        NDTensor {data: &self.data * &rhs.data}
+    }
+}
+
+
+impl<TE: TensorElement> ops::Sub for &NDTensor<TE> {
+    type Output = NDTensor<TE>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        NDTensor {data: &self.data - &rhs.data}
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     fn double<TE: TensorElement>(x: TE) -> TE {
@@ -279,6 +299,33 @@ mod tests {
     
     fn halve_tensor_inplace<T: TensorBase>(tensor: &mut T) {
         tensor.map_inplace(halve)
+    }
+
+    #[test]
+    fn test_add() {
+        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
+        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let result = &tensor_a + &tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![1., 1.], vec![1., 1.]));
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_mul() {
+        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
+        let tensor_b = NDTensor::from_vec(&vec!(vec![-1., -2.], vec![-3., -4.]));
+        let result = &tensor_a * &tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![-1., -4.], vec![-9., -16.]));
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_sub() {
+        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
+        let tensor_b = NDTensor::from_vec(&vec!(vec![-1., -2.], vec![-3., -4.]));
+        let result = &tensor_a - &tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![2., 4.], vec![6., 8.]));
+        assert_eq!(result, expected);
     }
 }    
 
