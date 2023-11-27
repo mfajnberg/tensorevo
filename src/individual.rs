@@ -182,7 +182,7 @@ impl<T: Tensor> Individual<T> {
             );
         }
         validation_data.map(|(input, desired_output)| 
-            trace!("validation error: {}", Some(self.calculate_error(input, desired_output)))
+            trace!("validation error: {}", self.calculate_error(input, desired_output))
         );
     }
 
@@ -330,7 +330,7 @@ mod tests {
         let training_data = vec![(input1, expected_output1), (input2, expected_output2)];
         for i in 0..500 {
             println!("\nepoch: {}", i + 1);
-            individual.stochastic_gradient_descent(&training_data, None, 0.01);
+            individual.stochastic_gradient_descent(&training_data, 0.01, None);
             println!("weights 1:\n{}", individual.layers[0].weights);
             println!("biases 1:\n{}", individual.layers[0].biases);
             println!("weights 2:\n{}", individual.layers[1].weights);

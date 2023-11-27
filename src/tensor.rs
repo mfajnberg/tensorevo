@@ -2,6 +2,7 @@
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::iter::Sum;
+use std::ops;
 
 use ndarray::{Array2, Axis};
 use num_traits::{Float, FromPrimitive};
@@ -10,6 +11,7 @@ use serde::de::DeserializeOwned;
 
 
 /// Tensor Element
+// TODO: Consider seprating some of those supertraits.
 pub trait TensorElement:
     // https://doc.rust-lang.org/rust-by-example/scope/lifetime/static_lifetime.html#trait-bound
     'static
@@ -42,12 +44,11 @@ where N:
 /// Types that support required linear algebra operations
 /// Can be created from vectors, json, or a number
 /// Can map functions
-pub trait Tensor:
-    Debug
-    + DeserializeOwned
+pub trait TensorBase:
+    Clone
+    + Debug
     + Display
     + PartialEq
-    + Serialize
     + Sized
     // TODO: Add all relevant operator overloading traits from `std::ops`.
     //       https://github.com/mfajnberg/tensorevo/issues/5
@@ -57,17 +58,11 @@ pub trait Tensor:
     /// Creates a Tensor from a Vec of TensorElements
     fn from_vec(v: &[Vec<Self::Element>]) -> Self;
     
-    /// Creates a Tensor from a json array of arrays of numbers
-    // https://doc.rust-lang.org/book/ch10-02-traits.html#default-implementations
-    fn from_json(s: &str) -> Self {
-        let v: Vec<Vec<Self::Element>> = serde_json::from_str(s).unwrap();
-        return Self::from_vec(&v);
-    }
-    
     /// Creates a `Tensor` from a number
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self;
     
     /// Creates a `Tensor` with only zeros given a 2d shape
+    // TODO: Provide a default implementation using `from_num`.
     fn zeros(shape: (usize, usize)) -> Self;
     
     /// Returns the 2d shape of self as a tuple
@@ -76,24 +71,18 @@ pub trait Tensor:
     /// Returns a vector of vectors of the tensor's elements
     fn to_vec(&self) -> Vec<Vec<Self::Element>>;
     
-    /// Returns a copy of the tensor
-    fn clone(&self) -> Self;
-    
     /// Returns the transpose of itself as a new tensor
     fn transpose(&self) -> Self;
-    
-    /// Returns a new tensor that is the sum of itself and another tensor
-    fn add(&self, other: &Self) -> Self;
-    
+
     /// Returns a new tensor that is the difference between itself and another tensor
     fn sub(&self, other: &Self) -> Self;
-    
+
     /// Returns a new tensor that is the dot product of itself and another tensor
     fn dot(&self, other: &Self) -> Self;
-    
+
     /// Returns a new tensor that is the element-wise product of itself and another tensor
     fn hadamard(&self, other: &Self) -> Self;
-    
+
     /// Maps a function to each element and returns the result as a new tensor
     fn map<F>(&self, f: F) -> Self
     where F: FnMut(Self::Element) -> Self::Element;
@@ -110,6 +99,29 @@ pub trait Tensor:
 }
 
 
+pub trait Dot<Rhs> {
+    type Output;
+
+    fn dot(&self, rhs: &Rhs) -> Self::Output;
+}
+
+
+pub trait TensorOp =
+    TensorBase +
+    // Dot<Self> +
+    where for<'a> &'a Self:
+        ops::Add<Output = Self> +
+        // ops::Mul<Output = Self> +
+        // ops::Sub<Output = Self>
+;
+
+
+pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
+
+
+pub trait Tensor = TensorOp + TensorSerde;
+
+
 /// Takes a serde `Deserializer` and constructs a `Tensor` object from it.
 ///
 /// Until we can do `impl<T> Deserialize for T where T: Tensor`,
@@ -118,7 +130,7 @@ pub trait Tensor:
 pub fn deserialize_to_tensor<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
-    T: Tensor,
+    T: TensorBase,
 {
     let v = Vec::<Vec<T::Element>>::deserialize(deserializer)?;
     return Ok(T::from_vec(&v));
@@ -128,6 +140,7 @@ where
 /// Reference `Tensor` implementation using `ndarray` data structures
 ///
 /// Data is currently always stored as a 2D array!
+#[derive(Clone, Debug, PartialEq)]
 pub struct NDTensor<TE: TensorElement> {
     // https://docs.rs/ndarray/latest/ndarray/type.Array2.html
     data: Array2<TE>,
@@ -161,7 +174,7 @@ impl<TE: TensorElement> Serialize for NDTensor<TE> {
 
 
 /// Generic implementation of `Tensor` for `NDTensor` in terms of any `TensorElement`.
-impl<TE: TensorElement> Tensor for NDTensor<TE> {
+impl<TE: TensorElement> TensorBase for NDTensor<TE> {
     type Element = TE;
 
     fn from_vec(v: &[Vec<Self::Element>]) -> Self {
@@ -195,16 +208,8 @@ impl<TE: TensorElement> Tensor for NDTensor<TE> {
         return output;
     }
 
-    fn clone(&self) -> Self {
-        return Self {data: self.data.to_owned()};
-    }
-
     fn transpose(&self) -> Self {
         return Self {data: self.data.t().to_owned()}
-    }
-
-    fn add(&self, other: &Self) -> Self {
-        return Self {data: &self.data.view() + &other.data.view()};
     }
 
     fn sub(&self, other: &Self) -> Self {
@@ -247,19 +252,11 @@ impl<TE: TensorElement> Display for NDTensor<TE> {
 }
 
 
-/// Allow printing `NDTensor` objects via `{}`
-impl<TE: TensorElement> Debug for NDTensor<TE> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
+    type Output = NDTensor<TE>;
 
-        return write!(f, "{:?}", self.data);
-    }
-}
-
-
-///
-impl<TE: TensorElement> PartialEq for NDTensor<TE> {
-    fn eq(&self, other: &Self) -> bool {
-        return self.data == other.data;
+    fn add(self, rhs: Self) -> Self::Output {
+        NDTensor {data: &self.data + &rhs.data}
     }
 }
 
@@ -276,86 +273,12 @@ mod tests {
         return x / TE::from_usize(2).unwrap();
     }
 
-    fn double_tensor<T: Tensor>(tensor: &T) -> T {
+    fn double_tensor<T: TensorBase>(tensor: &T) -> T {
         return tensor.map(double);
     }
     
-    fn halve_tensor_inplace<T: Tensor>(tensor: &mut T) {
+    fn halve_tensor_inplace<T: TensorBase>(tensor: &mut T) {
         tensor.map_inplace(halve)
     }
-    
-    #[test]
-    fn test() {
-        // Add, subtract, dot-multiply:
-
-        let a = NDTensor::from_vec(
-            &vec![
-                vec![1., 2.]
-            ]
-        );
-        let b = NDTensor::from_vec(
-            &vec![
-                vec![1.],
-                vec![0.],
-            ]
-        );
-        let mut c = NDTensor::from_vec(
-            &vec![
-                vec![2.],
-                vec![3.],
-            ]
-        );
-
-        let result = b.add(&c);
-        println!("{}", result);
-
-        let result = c.sub(&b);
-        println!("{}", result);
-        println!("{}", b);
-        println!("{}", c);
-
-        let result = b.dot(&a);
-        println!("{}", result);
-
-        // Map functions:
-
-        let result = c.map(double);
-        println!("{}", result);
-
-        c.map_inplace(halve);
-        println!("{}", c);
-
-        // Functions taking generic tensors:
-
-        let result = double_tensor(&c);
-        println!("{}", result);
-
-        halve_tensor_inplace(&mut c);
-        println!("{}", c);
-
-        // Create a new tensor from squaring each element in `a`:
-        let square: fn(f64) -> f64 = |x| x.powf(2.);
-        let a_squared = a.map(square);
-        println!("{}", a_squared);
-
-        // Double every element in `c` (in-place):
-        let double: fn(f64) -> f64 = |x| 2. * x;
-        c.map_inplace(double);
-        println!("{}", c);
-
-        let z: NDTensor<f32> = NDTensor::<f32>::zeros(b.shape());
-        println!("{}", z);
-        println!("{:?}", z.shape());
-
-        println!("{}", a);
-        println!("{}", a.transpose());
-        println!("{}", a.transpose().transpose());
-
-        let ones = NDTensor::<f32>::from_num(1., (2, 2));
-        println!("{}", ones);
-
-        println!("{}", ones.sum_axis(0));
-        println!("{}", ones.sum_axis(1));
-    }
-}
+}    
 

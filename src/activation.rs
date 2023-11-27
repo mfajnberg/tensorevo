@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::tensor::{Tensor, TensorElement};
+use crate::tensor::{TensorBase, TensorElement};
 
 
 type TFunc<T> = fn(&T) -> T;
@@ -14,7 +14,7 @@ type TFunc<T> = fn(&T) -> T;
 /// This is used in the `Layer` struct.
 /// Facilitates (de-)serialization.
 #[derive(Debug, Eq, PartialEq)]
-pub struct Activation<T: Tensor> {
+pub struct Activation<T: TensorBase> {
     name: String,
     function: TFunc<T>,
     derivative: TFunc<T>,
@@ -22,7 +22,7 @@ pub struct Activation<T: Tensor> {
 
 
 /// Methods for convenient construction and calling.
-impl<T: Tensor> Activation<T> {
+impl<T: TensorBase> Activation<T> {
     /// Basic constructor to manually define all fields.
     pub fn new(name: &str, function: TFunc<T>, derivative: TFunc<T>) -> Self {
         return Self{name: name.to_owned(), function, derivative}
@@ -63,7 +63,7 @@ impl<T: Tensor> Activation<T> {
 
 
 /// Allows `serde` to serialize `Activation` objects.
-impl<T: Tensor> Serialize for Activation<T> {
+impl<T: TensorBase> Serialize for Activation<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         return serializer.serialize_str(&self.name);
     }
@@ -71,7 +71,7 @@ impl<T: Tensor> Serialize for Activation<T> {
 
 
 /// Allows `serde` to deserialize to `Activation` objects.
-impl<'de, T: Tensor> Deserialize<'de> for Activation<T> {
+impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let name = String::deserialize(deserializer)?;
         return Ok(Self::from_name(name.as_str()));
@@ -82,7 +82,7 @@ impl<'de, T: Tensor> Deserialize<'de> for Activation<T> {
 /// Reference implementation of the sigmoid activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid<T: Tensor>(tensor: &T) -> T {
+pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
     return tensor.map(sigmoid_element);
 }
 
@@ -90,7 +90,7 @@ pub fn sigmoid<T: Tensor>(tensor: &T) -> T {
 /// Reference implementation of the sigmoid activation function.
 ///
 /// Takes a tensor as input and mutates it in place.
-pub fn sigmoid_inplace<T: Tensor>(tensor: &mut T) {
+pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
     tensor.map_inplace(sigmoid_element);
 }
 
@@ -105,7 +105,7 @@ pub fn sigmoid_element<TE: TensorElement>(number: TE) -> TE {
 /// Reference implementation of the derivative of the sigmoid activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid_prime<T: Tensor>(tensor: &T) -> T {
+pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
     return tensor.map(sigmoid_prime_element);
 }
 
@@ -120,7 +120,7 @@ pub fn sigmoid_prime_element<TE: TensorElement>(number: TE) -> TE {
 /// Reference implementation of the Rectified Linear Unit (RELU) activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn relu<T: Tensor>(tensor: &T) -> T {
+pub fn relu<T: TensorBase>(tensor: &T) -> T {
     return tensor.map(relu_element);
 }
 
@@ -138,7 +138,7 @@ pub fn relu_element<TE: TensorElement>(number: TE) -> TE {
 /// Reference implementation of the derivative of the Rectified Linear Unit (RELU) activation function.
 ///
 /// Takes a tensor as input and returns a new tensor.
-pub fn relu_prime<T: Tensor>(tensor: &T) -> T {
+pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
     return tensor.map(relu_prime_element);
 }
 
