@@ -74,9 +74,6 @@ pub trait TensorBase:
     /// Returns the transpose of itself as a new tensor
     fn transpose(&self) -> Self;
 
-    /// Returns a new tensor that is the dot product of itself and another tensor
-    fn dot(&self, other: &Self) -> Self;
-
     /// Returns a new tensor that is the element-wise product of itself and another tensor
     fn hadamard(&self, other: &Self) -> Self;
 
@@ -96,18 +93,19 @@ pub trait TensorBase:
 }
 
 
-pub trait Dot<Rhs> {
+pub trait Dot<Rhs = Self> {
     type Output;
 
-    fn dot(&self, rhs: &Rhs) -> Self::Output;
+    fn dot(&self, rhs: Rhs) -> Self::Output;
 }
 
 
 pub trait TensorOp =
 where 
     for<'a> Self:
-        // Dot<Self> +
         TensorBase +
+        Dot<Output = Self> +
+        Dot<&'a Self, Output = Self> +
         ops::AddAssign<&'a Self> +
         ops::DivAssign<&'a Self> +
         ops::MulAssign<&'a Self> +
@@ -215,10 +213,6 @@ impl<TE: TensorElement> TensorBase for NDTensor<TE> {
         return Self {data: self.data.t().to_owned()}
     }
 
-    fn dot(&self, other: &Self) -> Self {
-        return Self {data: self.data.dot(&other.data)};
-    }
-
     fn hadamard(&self, other: &Self) -> Self {
         return Self {data: &self.data * &other.data}
     }
@@ -249,6 +243,28 @@ impl<TE: TensorElement> Display for NDTensor<TE> {
         return write!(f, "{}", self.data);
     }
 }
+
+
+impl<TE: TensorElement> Dot for NDTensor<TE> {
+    type Output = Self;
+
+    fn dot(&self, rhs: Self) -> Self::Output {
+        Self {data: self.data.dot(&rhs.data)}
+    }
+}
+
+
+impl<TE: TensorElement> Dot<&NDTensor<TE>> for NDTensor<TE> {
+    type Output = Self;
+
+    fn dot(&self, rhs: &Self) -> Self::Output {
+        Self {data: self.data.dot(&rhs.data)}
+    }
+}
+
+
+// Arithmetic trait implementations from `std::ops`.
+// TODO: Write a macro for those.
 
 
 impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
@@ -338,6 +354,18 @@ mod tests {
     }
 
     #[test]
+    fn test_dot() {
+        let tensor_a = NDTensor::from_vec(&vec![vec![0., 1., 2.], vec![3., 2., 1.]]);
+        let tensor_b = NDTensor::from_vec(&vec![vec![-1., -2.], vec![-3., -2.], vec![-1., 0.]]);
+        let result = tensor_a.dot(tensor_b);  // move
+        let expected = NDTensor::from_vec(&vec!(vec![-5., -2.], vec![-10., -10.]));
+        assert_eq!(result, expected);
+        let result2 = result.dot(&result);  // borrow
+        let expected2 = NDTensor::from_vec(&vec!(vec![45., 30.], vec![150., 120.]));
+        assert_eq!(result2, expected2);
+    }
+
+    #[test]
     fn test_add() {
         let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
         let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
@@ -413,7 +441,7 @@ mod tests {
     /// Also tests that `NDTensor` fully implements `TensorOp`.
     /// Only for the compiler, doesn't need to be executed as a test.
     fn test_tensor_op() {
-        fn some_generic_func<T: TensorOp>(mut t1: T, mut t2: T) {
+        fn some_generic_func<T: TensorOp>(mut t1: T, t2: T) {
             t1 += &t2;
             t1 /= &t2;
             t1 *= &t2;
@@ -422,8 +450,10 @@ mod tests {
             let _ = &t1 - &t2;
             let _ = &t1 * &t2;
             let _ = &t1 / &t2;
+            t1.dot(&t2);
+            t1.dot(t2);
         }
-        let mut tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
+        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
         let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
         some_generic_func(tensor_a, tensor_b);
     }
