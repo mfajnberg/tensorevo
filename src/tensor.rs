@@ -74,9 +74,6 @@ pub trait TensorBase:
     /// Returns the transpose of itself as a new tensor
     fn transpose(&self) -> Self;
 
-    /// Returns a new tensor that is the difference between itself and another tensor
-    // fn sub(&self, other: &Self) -> Self;
-
     /// Returns a new tensor that is the dot product of itself and another tensor
     fn dot(&self, other: &Self) -> Self;
 
@@ -211,10 +208,6 @@ impl<TE: TensorElement> TensorBase for NDTensor<TE> {
     fn transpose(&self) -> Self {
         return Self {data: self.data.t().to_owned()}
     }
-
-    // fn sub(&self, other: &Self) -> Self {
-    //     return Self {data: &self.data - &other.data};
-    // }
 
     fn dot(&self, other: &Self) -> Self {
         return Self {data: self.data.dot(&other.data)};

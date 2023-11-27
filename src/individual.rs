@@ -134,13 +134,13 @@ impl<T: Tensor> Individual<T> {
         let last_activation: &T = activations.last().unwrap();
         let cost_derivative = self.cost_function.call_derivative(&last_activation, batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
-        let mut delta = cost_derivative.hadamard(&self.layers[num_layers - 1].activation.call_derivative(weighted_input));
+        let mut delta = &cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
         nabla_weights[num_layers - 1] = delta.dot(&activations[num_layers - 2].transpose());
         nabla_biases[num_layers - 1] = delta.sum_axis(1);
         for layer_num in (0..num_layers - 1).rev() {
             let weighted_input = &weighted_inputs[layer_num];
             let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
-            delta = self.layers[layer_num + 1].weights.transpose().dot(&delta).hadamard(&sp);
+            delta = &self.layers[layer_num + 1].weights.transpose().dot(&delta) * &sp;
             if layer_num > 0 {
                 nabla_weights[layer_num] = delta.dot(&activations[layer_num - 1].transpose());
             } else { // activation of input layer == input
@@ -169,17 +169,15 @@ impl<T: Tensor> Individual<T> {
         validation_data: Option<(&T, &T)>,
     ) {
         let num_layers = self.layers.len();
-        let (nabla_biases, nabla_weights) = self.backprop(
-            batch_inputs, batch_desired_outputs);
+        let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
-            self.layers[idx].weights = self.layers[idx].weights.sub(
-                &weights_update_factor.hadamard(&nabla_weights[idx])
-            );
+            // TODO: These operations shall be further simplfied, once
+            // - `SubAssign` is required for `&TensorOp` and
+            // - `Mul<TensorOp>` is required for `&TensorOp` (right-hand side being consumed).
+            self.layers[idx].weights = &self.layers[idx].weights - &(&weights_update_factor * &nabla_weights[idx]);
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
-            self.layers[idx].biases = self.layers[idx].biases.sub(
-                &biases_update_factor.hadamard(&nabla_biases[idx])
-            );
+            self.layers[idx].biases = &self.layers[idx].biases - &(&biases_update_factor * &nabla_biases[idx]);
         }
         validation_data.map(|(input, desired_output)| 
             trace!("validation error: {}", self.calculate_error(input, desired_output))
@@ -298,7 +296,7 @@ mod tests {
                     activation: Activation::<NDTensor<f64>>::from_name("relu"),
                 },
             ],
-            CostFunction::from_name("quadratic"),
+            CostFunction::<NDTensor<f64>>::from_name("quadratic"),
         );
         let input1 = NDTensor::from_vec(
             &vec![
