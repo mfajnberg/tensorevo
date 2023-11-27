@@ -108,8 +108,9 @@ pub trait TensorOp =
     // Dot<Self> +
     where for<'a> &'a Self:
         ops::Add<Output = Self> +
+        ops::Div<Output = Self> +
         ops::Mul<Output = Self> +
-        ops::Sub<Output = Self>
+        ops::Sub<Output = Self> +
 ;
 
 
@@ -254,6 +255,15 @@ impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
 }
 
 
+impl<TE: TensorElement> ops::Div for &NDTensor<TE> {
+    type Output = NDTensor<TE>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        NDTensor {data: &self.data / &rhs.data}
+    }
+}
+
+
 impl<TE: TensorElement> ops::Mul for &NDTensor<TE> {
     type Output = NDTensor<TE>;
 
@@ -300,6 +310,15 @@ mod tests {
         let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
         let result = &tensor_a + &tensor_b;
         let expected = NDTensor::from_vec(&vec!(vec![1., 1.], vec![1., 1.]));
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_div() {
+        let tensor_a = NDTensor::from_vec(&vec!(vec![2., 4.], vec![6., 8.]));
+        let tensor_b = NDTensor::from_vec(&vec!(vec![2., -1.], vec![-2., -4.]));
+        let result = &tensor_a / &tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![1., -4.], vec![-3., -2.]));
         assert_eq!(result, expected);
     }
 
