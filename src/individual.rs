@@ -174,9 +174,9 @@ impl<T: Tensor> Individual<T> {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
             // TODO: These operations shall be further simplfied, once
             //       `Mul<TensorOp>` is required for `&TensorOp` (right-hand side being consumed).
-            self.layers[idx].weights -= &(&weights_update_factor * &nabla_weights[idx]);
+            self.layers[idx].weights -= &weights_update_factor * &nabla_weights[idx];
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
-            self.layers[idx].biases -= &(&biases_update_factor * &nabla_biases[idx]);
+            self.layers[idx].biases -= &biases_update_factor * &nabla_biases[idx];
         }
         validation_data.map(|(input, desired_output)| 
             trace!("validation error: {}", self.calculate_error(input, desired_output))

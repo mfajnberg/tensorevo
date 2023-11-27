@@ -103,9 +103,13 @@ where
         TensorBase +
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
+        ops::AddAssign +
         ops::AddAssign<&'a Self> +
+        ops::DivAssign +
         ops::DivAssign<&'a Self> +
+        ops::MulAssign +
         ops::MulAssign<&'a Self> +
+        ops::SubAssign +
         ops::SubAssign<&'a Self>,
     for<'a> &'a Self:
         ops::Add<Output = Self> +
@@ -269,6 +273,13 @@ impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
 }
 
 
+impl<TE: TensorElement> ops::AddAssign for NDTensor<TE> {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = NDTensor {data: &self.data + &rhs.data};
+    }
+}
+
+
 impl<TE: TensorElement> ops::AddAssign<&NDTensor<TE>> for NDTensor<TE> {
     fn add_assign(&mut self, rhs: &Self) {
         *self = NDTensor {data: &self.data + &rhs.data};
@@ -281,6 +292,13 @@ impl<TE: TensorElement> ops::Div for &NDTensor<TE> {
 
     fn div(self, rhs: Self) -> Self::Output {
         NDTensor {data: &self.data / &rhs.data}
+    }
+}
+
+
+impl<TE: TensorElement> ops::DivAssign for NDTensor<TE> {
+    fn div_assign(&mut self, rhs: Self) {
+        *self = NDTensor {data: &self.data / &rhs.data};
     }
 }
 
@@ -301,6 +319,13 @@ impl<TE: TensorElement> ops::Mul for &NDTensor<TE> {
 }
 
 
+impl<TE: TensorElement> ops::MulAssign for NDTensor<TE> {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = NDTensor {data: &self.data * &rhs.data};
+    }
+}
+
+
 impl<TE: TensorElement> ops::MulAssign<&NDTensor<TE>> for NDTensor<TE> {
     fn mul_assign(&mut self, rhs: &Self) {
         *self = NDTensor {data: &self.data * &rhs.data};
@@ -313,6 +338,13 @@ impl<TE: TensorElement> ops::Sub for &NDTensor<TE> {
 
     fn sub(self, rhs: Self) -> Self::Output {
         NDTensor {data: &self.data - &rhs.data}
+    }
+}
+
+
+impl<TE: TensorElement> ops::SubAssign for NDTensor<TE> {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = NDTensor {data: &self.data - &rhs.data};
     }
 }
 
@@ -350,10 +382,10 @@ mod tests {
     fn test_dot() {
         let tensor_a = NDTensor::from_vec(&vec![vec![0., 1., 2.], vec![3., 2., 1.]]);
         let tensor_b = NDTensor::from_vec(&vec![vec![-1., -2.], vec![-3., -2.], vec![-1., 0.]]);
-        let result = tensor_a.dot(tensor_b);  // move
+        let result = tensor_a.dot(tensor_b);
         let expected = NDTensor::from_vec(&vec!(vec![-5., -2.], vec![-10., -10.]));
         assert_eq!(result, expected);
-        let result2 = result.dot(&result);  // borrow
+        let result2 = result.dot(&result);
         let expected2 = NDTensor::from_vec(&vec!(vec![45., 30.], vec![150., 120.]));
         assert_eq!(result2, expected2);
     }
@@ -374,6 +406,9 @@ mod tests {
         tensor_a += &tensor_b;
         let expected = NDTensor::from_vec(&vec!(vec![1., 1.], vec![1., 1.]));
         assert_eq!(tensor_a, expected);
+        tensor_a += tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![1., 0.], vec![-1., -2.]));
+        assert_eq!(tensor_a, expected);
     }
 
     #[test]
@@ -391,6 +426,9 @@ mod tests {
         let tensor_b = NDTensor::from_vec(&vec!(vec![1., -1.], vec![-1., -2.]));
         tensor_a /= &tensor_b;
         let expected = NDTensor::from_vec(&vec!(vec![1., -2.], vec![-3., -2.]));
+        assert_eq!(tensor_a, expected);
+        tensor_a /= tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 1.]));
         assert_eq!(tensor_a, expected);
     }
 
@@ -410,6 +448,9 @@ mod tests {
         tensor_a *= &tensor_b;
         let expected = NDTensor::from_vec(&vec!(vec![0., -2.], vec![-6., -12.]));
         assert_eq!(tensor_a, expected);
+        tensor_a *= tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![0., 2.], vec![12., 36.]));
+        assert_eq!(tensor_a, expected);
     }
 
     #[test]
@@ -428,21 +469,29 @@ mod tests {
         tensor_a -= &tensor_b;
         let expected = NDTensor::from_vec(&vec!(vec![1., 3.], vec![5., 7.]));
         assert_eq!(tensor_a, expected);
+        tensor_a -= tensor_b;
+        let expected = NDTensor::from_vec(&vec!(vec![1., 4.], vec![7., 10.]));
+        assert_eq!(tensor_a, expected);
     }
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// Also tests that `NDTensor` fully implements `TensorOp`.
     /// Only for the compiler, doesn't need to be executed as a test.
+    #[allow(dead_code)]
     fn test_tensor_op() {
         fn some_generic_func<T: TensorOp>(mut t1: T, t2: T) {
             t1 += &t2;
             t1 /= &t2;
             t1 *= &t2;
             t1 -= &t2;
-            let _ = &t1 + &t2;
-            let _ = &t1 - &t2;
-            let _ = &t1 * &t2;
-            let _ = &t1 / &t2;
+            let t5 = &t1 + &t2;
+            let t6 = &t1 - &t2;
+            let t7 = &t1 * &t2;
+            let t8 = &t1 / &t2;
+            t1 += t5;
+            t1 += t6;
+            t1 += t7;
+            t1 += t8;
             t1.dot(&t2);
             t1.dot(t2);
         }
