@@ -74,9 +74,6 @@ pub trait TensorBase:
     /// Returns the transpose of itself as a new tensor
     fn transpose(&self) -> Self;
 
-    /// Returns a new tensor that is the element-wise product of itself and another tensor
-    fn hadamard(&self, other: &Self) -> Self;
-
     /// Maps a function to each element and returns the result as a new tensor
     fn map<F>(&self, f: F) -> Self
     where F: FnMut(Self::Element) -> Self::Element;
@@ -211,10 +208,6 @@ impl<TE: TensorElement> TensorBase for NDTensor<TE> {
 
     fn transpose(&self) -> Self {
         return Self {data: self.data.t().to_owned()}
-    }
-
-    fn hadamard(&self, other: &Self) -> Self {
-        return Self {data: &self.data * &other.data}
     }
 
     fn map<F>(&self, f: F) -> Self
