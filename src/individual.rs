@@ -193,7 +193,7 @@ impl<T: Tensor> Individual<T> {
     /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     pub fn stochastic_gradient_descent(
         &mut self,
-        training_data: &Vec<(T, T)>,
+        training_data: Vec<(&T, &T)>,
         learning_rate: f32,
         validation_data: Option<(&T, &T)>,
     ) {
@@ -230,7 +230,7 @@ mod tests {
 
     use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
     use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
-    use crate::tensor::{NDTensor, TensorBase};
+    use crate::tensor::NDTensor;
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
@@ -259,80 +259,4 @@ mod tests {
         assert_eq!(individual_expected, individual_loaded);
         return Ok(());
     }
-    
-    fn test_sgd() {
-        let mut individual = Individual::new(
-            vec![
-                Layer{
-                    weights: NDTensor::from_array(
-                        [
-                            [1., 0.],
-                            [0., 1.],
-                        ]
-                    ),
-                    biases: NDTensor::from_array(
-                        [
-                            [0.],
-                            [0.],
-                        ]
-                    ),
-                    activation: Activation::<NDTensor<f64>>::from_name("relu"),
-                },
-                Layer{
-                    weights: NDTensor::from_array(
-                        [
-                            [1., 0.],
-                            [0., 1.],
-                        ]
-                    ),
-                    biases: NDTensor::from_array(
-                        [
-                            [0.],
-                            [0.],
-                        ]
-                    ),
-                    activation: Activation::<NDTensor<f64>>::from_name("relu"),
-                },
-            ],
-            CostFunction::<NDTensor<f64>>::from_name("quadratic"),
-        );
-        let input1 = NDTensor::from_array(
-            [
-                [1., 2.],
-                [1., 3.],
-            ]
-        );
-        let input2 = NDTensor::from_array(
-            [
-                [4., 1.],
-                [5., 1.],
-            ]
-        );
-        println!("inputs:\n{}\n{}\n", &input1, &input2);
-        let expected_output1 = NDTensor::from_array(
-            [
-                [10., 5.],
-                [1., 5.],
-            ]
-        );
-        let expected_output2 = NDTensor::from_array(
-            [
-                [5., 10.],
-                [4., 1.],
-            ]
-        );
-        println!("output1 before sgd:\n{}\n", individual.forward_pass(&input1));
-        println!("output2 before sgd:\n{}\n", individual.forward_pass(&input2));
-        let training_data = vec![(input1, expected_output1), (input2, expected_output2)];
-        for i in 0..500 {
-            println!("\nepoch: {}", i + 1);
-            individual.stochastic_gradient_descent(&training_data, 0.01, None);
-            println!("weights 1:\n{}", individual.layers[0].weights);
-            println!("biases 1:\n{}", individual.layers[0].biases);
-            println!("weights 2:\n{}", individual.layers[1].weights);
-            println!("biases 2:\n{}", individual.layers[1].biases);
-            println!("\noutput1:\n{}", individual.forward_pass(&training_data[0].0));
-            println!("output2:\n{}", individual.forward_pass(&training_data[1].0));
-        }
-    }
-}
+} 
