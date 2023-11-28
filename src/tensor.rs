@@ -385,117 +385,129 @@ impl<TE: TensorElement> ops::SubAssign<&NDTensor<TE>> for NDTensor<TE> {
 mod tests {
     use super::*;
 
-    fn double<TE: TensorElement>(x: TE) -> TE {
-        return x * TE::from_usize(2).unwrap();
-    }
+    mod test_ndtensor {
+        use super::*;
 
-    fn halve<TE: TensorElement>(x: TE) -> TE {
-        return x / TE::from_usize(2).unwrap();
-    }
-
-    fn double_tensor<T: TensorBase>(tensor: &T) -> T {
-        return tensor.map(double);
-    }
+        fn double<TE: TensorElement>(x: TE) -> TE {
+            return x * TE::from_usize(2).unwrap();
+        }
     
-    fn halve_tensor_inplace<T: TensorBase>(tensor: &mut T) {
-        tensor.map_inplace(halve)
-    }
+        fn halve<TE: TensorElement>(x: TE) -> TE {
+            return x / TE::from_usize(2).unwrap();
+        }
+    
+        #[test]
+        fn test_map() {
+            let tensor = NDTensor::from_array([[0., 1.], [2., 3.]]);
+            let result = tensor.map(double);
+            let expected = NDTensor::from_array([[0., 2.], [4., 6.]]);
+            assert_eq!(result, expected);
+        }
+    
+        #[test]
+        fn test_map_inplace() {
+            let mut tensor = NDTensor::from_array([[0., -2.], [4., -6.]]);
+            tensor.map_inplace(halve);
+            let expected = NDTensor::from_array([[0., -1.], [2., -3.]]);
+            assert_eq!(tensor, expected);
+        }
+    
+        #[test]
+        fn test_dot() {
+            let tensor_a = NDTensor::from_array([[0., 1., 2.], [3., 2., 1.]]);
+            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
+            let result = tensor_a.dot(tensor_b);
+            let expected = NDTensor::from_array([[-5., -2.], [-10., -10.]]);
+            assert_eq!(result, expected);
+            let result2 = result.dot(&result);
+            let expected2 = NDTensor::from_array([[45., 30.], [150., 120.]]);
+            assert_eq!(result2, expected2);
+        }
+    
+        #[test]
+        fn test_add() {
+            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
+            let result = &tensor_a + &tensor_b;
+            let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
+            assert_eq!(result, expected);
+        }
+    
+        #[test]
+        fn test_add_assign() {
+            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
+            tensor_a += &tensor_b;
+            let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
+            assert_eq!(tensor_a, expected);
+            tensor_a += tensor_b;
+            let expected = NDTensor::from_array([[1., 0.], [-1., -2.]]);
+            assert_eq!(tensor_a, expected);
+        }
+    
+        #[test]
+        fn test_div() {
+            let tensor_a = NDTensor::from_array([[2., 4.], [6., 8.]]);
+            let tensor_b = NDTensor::from_array([[2., -1.], [-2., -4.]]);
+            let result = &tensor_a / &tensor_b;
+            let expected = NDTensor::from_array([[1., -4.], [-3., -2.]]);
+            assert_eq!(result, expected);
+        }
 
-    #[test]
-    fn test_dot() {
-        let tensor_a = NDTensor::from_array([[0., 1., 2.], [3., 2., 1.]]);
-        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
-        let result = tensor_a.dot(tensor_b);
-        let expected = NDTensor::from_array([[-5., -2.], [-10., -10.]]);
-        assert_eq!(result, expected);
-        let result2 = result.dot(&result);
-        let expected2 = NDTensor::from_array([[45., 30.], [150., 120.]]);
-        assert_eq!(result2, expected2);
-    }
+        #[test]
+        fn test_div_assign() {
+            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[1., -1.], [-1., -2.]]);
+            tensor_a /= &tensor_b;
+            let expected = NDTensor::from_array([[1., -2.], [-3., -2.]]);
+            assert_eq!(tensor_a, expected);
+            tensor_a /= tensor_b;
+            let expected = NDTensor::from_array([[1., 2.], [3., 1.]]);
+            assert_eq!(tensor_a, expected);
+        }
+    
+        #[test]
+        fn test_mul() {
+            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
+            let result = &tensor_a * &tensor_b;
+            let expected = NDTensor::from_array([[-1., -4.], [-9., -16.]]);
+            assert_eq!(result, expected);
+        }
+    
+        #[test]
+        fn test_mul_assign() {
+            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
+            tensor_a *= &tensor_b;
+            let expected = NDTensor::from_array([[0., -2.], [-6., -12.]]);
+            assert_eq!(tensor_a, expected);
+            tensor_a *= tensor_b;
+            let expected = NDTensor::from_array([[0., 2.], [12., 36.]]);
+            assert_eq!(tensor_a, expected);
+        }
+    
+        #[test]
+        fn test_sub() {
+            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
+            let result = &tensor_a - &tensor_b;
+            let expected = NDTensor::from_array([[2., 4.], [6., 8.]]);
+            assert_eq!(result, expected);
+        }
 
-    #[test]
-    fn test_add() {
-        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-        let result = &tensor_a + &tensor_b;
-        let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_add_assign() {
-        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-        tensor_a += &tensor_b;
-        let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
-        assert_eq!(tensor_a, expected);
-        tensor_a += tensor_b;
-        let expected = NDTensor::from_array([[1., 0.], [-1., -2.]]);
-        assert_eq!(tensor_a, expected);
-    }
-
-    #[test]
-    fn test_div() {
-        let tensor_a = NDTensor::from_array([[2., 4.], [6., 8.]]);
-        let tensor_b = NDTensor::from_array([[2., -1.], [-2., -4.]]);
-        let result = &tensor_a / &tensor_b;
-        let expected = NDTensor::from_array([[1., -4.], [-3., -2.]]);
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_div_assign() {
-        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[1., -1.], [-1., -2.]]);
-        tensor_a /= &tensor_b;
-        let expected = NDTensor::from_array([[1., -2.], [-3., -2.]]);
-        assert_eq!(tensor_a, expected);
-        tensor_a /= tensor_b;
-        let expected = NDTensor::from_array([[1., 2.], [3., 1.]]);
-        assert_eq!(tensor_a, expected);
-    }
-
-    #[test]
-    fn test_mul() {
-        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
-        let result = &tensor_a * &tensor_b;
-        let expected = NDTensor::from_array([[-1., -4.], [-9., -16.]]);
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_mul_assign() {
-        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-        tensor_a *= &tensor_b;
-        let expected = NDTensor::from_array([[0., -2.], [-6., -12.]]);
-        assert_eq!(tensor_a, expected);
-        tensor_a *= tensor_b;
-        let expected = NDTensor::from_array([[0., 2.], [12., 36.]]);
-        assert_eq!(tensor_a, expected);
-    }
-
-    #[test]
-    fn test_sub() {
-        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
-        let result = &tensor_a - &tensor_b;
-        let expected = NDTensor::from_array([[2., 4.], [6., 8.]]);
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_sub_assign() {
-        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-        tensor_a -= &tensor_b;
-        let expected = NDTensor::from_array([[1., 3.], [5., 7.]]);
-        assert_eq!(tensor_a, expected);
-        tensor_a -= tensor_b;
-        let expected = NDTensor::from_array([[1., 4.], [7., 10.]]);
-        assert_eq!(tensor_a, expected);
-    }
+        #[test]
+        fn test_sub_assign() {
+            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
+            tensor_a -= &tensor_b;
+            let expected = NDTensor::from_array([[1., 3.], [5., 7.]]);
+            assert_eq!(tensor_a, expected);
+            tensor_a -= tensor_b;
+            let expected = NDTensor::from_array([[1., 4.], [7., 10.]]);
+            assert_eq!(tensor_a, expected);
+        }
+    }    
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// Also tests that `NDTensor` fully implements `TensorOp`.
