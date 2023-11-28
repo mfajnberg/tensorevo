@@ -131,8 +131,7 @@ impl<T: Tensor> Individual<T> {
             nabla_biases.push(T::zeros(layer.biases.shape()));
         }
         // Go backwards
-        let last_activation: &T = activations.last().unwrap();
-        let cost_derivative = self.cost_function.call_derivative(&last_activation, batch_desired_outputs);
+        let cost_derivative = self.cost_function.call_derivative(activations.last().unwrap(), batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
         let mut delta = &cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
         nabla_weights[num_layers - 1] = delta.dot(activations[num_layers - 2].transpose());
@@ -178,9 +177,9 @@ impl<T: Tensor> Individual<T> {
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
             self.layers[idx].biases -= &biases_update_factor * &nabla_biases[idx];
         }
-        validation_data.map(|(input, desired_output)| 
+        if let Some((input, desired_output)) = validation_data {
             trace!("validation error: {}", self.calculate_error(input, desired_output))
-        );
+        }
     }
 
     /// Updates the weights and biases of the individual, given an entire vector of training data.
