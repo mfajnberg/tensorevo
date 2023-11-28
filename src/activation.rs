@@ -171,36 +171,36 @@ mod tests {
 
         #[test]
         fn test_call() {
-            let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
+            let tensor = NDTensor::from_array([[-1., 2.]]);
             let activation = Activation {
                 name: "relu".to_owned(),
                 function: relu,
                 derivative: relu_prime
             };
             let output = activation.call(&tensor);
-            let expected_output = NDTensor::from_vec(&vec![vec![0., 2.]]);
+            let expected_output = NDTensor::from_array([[0., 2.]]);
             assert_eq!(output, expected_output);
         }
 
         #[test]
         fn test_call_derivative() {
-            let tensor = NDTensor::from_vec(&vec![vec![-1., 2.]]);
+            let tensor = NDTensor::from_array([[-1., 2.]]);
             let activation = Activation{
                 name: "relu".to_owned(),
                 function: relu,
                 derivative: relu_prime
             };
             let output = activation.call_derivative(&tensor);
-            let expected_output = NDTensor::from_vec(&vec![vec![0., 1.]]);
+            let expected_output = NDTensor::from_array([[0., 1.]]);
             assert_eq!(output, expected_output);
         }
     }
 
     #[test]
     fn test_sigmoid_inplace() {
-        let mut tensor = NDTensor::from_vec(&vec![vec![0., 36.]]);
+        let mut tensor = NDTensor::from_array([[0., 36.]]);
         sigmoid_inplace(&mut tensor);
-        let expected_tensor = NDTensor::from_vec(&vec![vec![0.5, 0.9999999999999998]]);
+        let expected_tensor = NDTensor::from_array([[0.5, 0.9999999999999998]]);
         assert_eq!(tensor, expected_tensor);
     }
 }

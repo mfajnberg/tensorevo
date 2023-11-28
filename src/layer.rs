@@ -27,27 +27,27 @@ impl<T: Tensor> Layer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tensor::NDTensor;
+    use crate::tensor::{NDTensor, TensorBase};
 
     #[test]
     fn test() {
-        let input = NDTensor::from_vec(
-            &vec![
-                vec![1.],
-                vec![1.],
+        let input = NDTensor::from_array(
+            [
+                [1.],
+                [1.],
             ]
         );
         let layer = Layer{
-            weights: NDTensor::from_vec(
-                &vec![
-                    vec![1., 0.],
-                    vec![0., 1.],
+            weights: NDTensor::from_array(
+                [
+                    [1., 0.],
+                    [0., 1.],
                 ]
             ),
-            biases: NDTensor::from_vec(
-                &vec![
-                    vec![-1.],
-                    vec![-1.],
+            biases: NDTensor::from_array(
+                [
+                    [-1.],
+                    [-1.],
                 ]
             ),
             activation: Activation::<NDTensor<f64>>::from_name("sigmoid"),

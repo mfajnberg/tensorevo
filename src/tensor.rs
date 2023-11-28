@@ -54,9 +54,12 @@ pub trait TensorBase:
     //       https://github.com/mfajnberg/tensorevo/issues/5
 {
     type Element: TensorElement;  // associated type must implement the `TensorElement` trait
+    
+    /// Creates a `Tensor` from an array of arrays of `TensorElement`
+    fn from_array<const M: usize, const N: usize>(a: [[Self::Element; N]; M]) -> Self;
 
-    /// Creates a Tensor from a Vec of TensorElements
-    fn from_vec(v: &[Vec<Self::Element>]) -> Self;
+    /// Creates a `Tensor` from a vector of vectors of `TensorElement`
+    fn from_vec(v: Vec<Vec<Self::Element>>) -> Self;
     
     /// Creates a `Tensor` from a number
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self;
@@ -135,7 +138,7 @@ where
     T: TensorBase,
 {
     let v = Vec::<Vec<T::Element>>::deserialize(deserializer)?;
-    return Ok(T::from_vec(&v));
+    return Ok(T::from_vec(v));
 }
 
 
@@ -154,6 +157,31 @@ impl<TE: TensorElement> NDTensor<TE> {
     /// Simple constructor to directly pass the data as an `ndarray`.
     pub fn new(data: Array2<TE>) -> Self {
         return Self{data}
+    }
+    
+    /// Constructs a new `NDTensor` from an iterator of iterators.
+    fn from_iter<I, J>(i: I) -> Self
+    where
+        I: IntoIterator<Item = J>,
+        J: IntoIterator<Item = TE>,
+    {
+        let mut data = Vec::new();
+        let mut num_rows: usize = 0;
+        let mut num_columns: Option<usize> = None;
+        for row in i {
+            num_rows += 1;
+            let row_vec: Vec<TE> = row.into_iter().collect();
+            match num_columns {
+                Some(n) => {
+                    if n != row_vec.len() { panic!() }
+                },
+                None => num_columns = Some(row_vec.len()),
+            }
+            data.extend_from_slice(&row_vec);
+        }
+        return Self::new(
+            Array2::from_shape_vec((num_rows, num_columns.unwrap_or(0)), data).unwrap()
+        );
     }
 }
 
@@ -179,15 +207,12 @@ impl<TE: TensorElement> Serialize for NDTensor<TE> {
 impl<TE: TensorElement> TensorBase for NDTensor<TE> {
     type Element = TE;
 
-    fn from_vec(v: &[Vec<Self::Element>]) -> Self {
-        let mut data = Vec::new();
-        let num_columns = v.first().map_or(0, |row| row.len());
-        let num_rows = v.len();
-        for row in v {
-            data.extend_from_slice(row);
-        }
-        let arr = Array2::from_shape_vec((num_rows, num_columns), data);
-        return Self {data: arr.unwrap()};
+    fn from_array<const M: usize, const N: usize>(a: [[TE; N]; M]) -> Self {
+        return Self::from_iter(a);
+    }
+
+    fn from_vec(v: Vec<Vec<Self::Element>>) -> Self {
+        return Self::from_iter(v);
     }
 
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self {
@@ -358,8 +383,6 @@ impl<TE: TensorElement> ops::SubAssign<&NDTensor<TE>> for NDTensor<TE> {
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
     use super::*;
 
     fn double<TE: TensorElement>(x: TE) -> TE {
@@ -380,97 +403,97 @@ mod tests {
 
     #[test]
     fn test_dot() {
-        let tensor_a = NDTensor::from_vec(&vec![vec![0., 1., 2.], vec![3., 2., 1.]]);
-        let tensor_b = NDTensor::from_vec(&vec![vec![-1., -2.], vec![-3., -2.], vec![-1., 0.]]);
+        let tensor_a = NDTensor::from_array([[0., 1., 2.], [3., 2., 1.]]);
+        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
         let result = tensor_a.dot(tensor_b);
-        let expected = NDTensor::from_vec(&vec!(vec![-5., -2.], vec![-10., -10.]));
+        let expected = NDTensor::from_array([[-5., -2.], [-10., -10.]]);
         assert_eq!(result, expected);
         let result2 = result.dot(&result);
-        let expected2 = NDTensor::from_vec(&vec!(vec![45., 30.], vec![150., 120.]));
+        let expected2 = NDTensor::from_array([[45., 30.], [150., 120.]]);
         assert_eq!(result2, expected2);
     }
 
     #[test]
     fn test_add() {
-        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
         let result = &tensor_a + &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 1.], vec![1., 1.]));
+        let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_add_assign() {
-        let mut tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
         tensor_a += &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 1.], vec![1., 1.]));
+        let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
         assert_eq!(tensor_a, expected);
         tensor_a += tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 0.], vec![-1., -2.]));
+        let expected = NDTensor::from_array([[1., 0.], [-1., -2.]]);
         assert_eq!(tensor_a, expected);
     }
 
     #[test]
     fn test_div() {
-        let tensor_a = NDTensor::from_vec(&vec!(vec![2., 4.], vec![6., 8.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![2., -1.], vec![-2., -4.]));
+        let tensor_a = NDTensor::from_array([[2., 4.], [6., 8.]]);
+        let tensor_b = NDTensor::from_array([[2., -1.], [-2., -4.]]);
         let result = &tensor_a / &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., -4.], vec![-3., -2.]));
+        let expected = NDTensor::from_array([[1., -4.], [-3., -2.]]);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_div_assign() {
-        let mut tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![1., -1.], vec![-1., -2.]));
+        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[1., -1.], [-1., -2.]]);
         tensor_a /= &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., -2.], vec![-3., -2.]));
+        let expected = NDTensor::from_array([[1., -2.], [-3., -2.]]);
         assert_eq!(tensor_a, expected);
         tensor_a /= tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 1.]));
+        let expected = NDTensor::from_array([[1., 2.], [3., 1.]]);
         assert_eq!(tensor_a, expected);
     }
 
     #[test]
     fn test_mul() {
-        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![-1., -2.], vec![-3., -4.]));
+        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
         let result = &tensor_a * &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![-1., -4.], vec![-9., -16.]));
+        let expected = NDTensor::from_array([[-1., -4.], [-9., -16.]]);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_mul_assign() {
-        let mut tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
         tensor_a *= &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![0., -2.], vec![-6., -12.]));
+        let expected = NDTensor::from_array([[0., -2.], [-6., -12.]]);
         assert_eq!(tensor_a, expected);
         tensor_a *= tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![0., 2.], vec![12., 36.]));
+        let expected = NDTensor::from_array([[0., 2.], [12., 36.]]);
         assert_eq!(tensor_a, expected);
     }
 
     #[test]
     fn test_sub() {
-        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![-1., -2.], vec![-3., -4.]));
+        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
         let result = &tensor_a - &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![2., 4.], vec![6., 8.]));
+        let expected = NDTensor::from_array([[2., 4.], [6., 8.]]);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_sub_assign() {
-        let mut tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
         tensor_a -= &tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 3.], vec![5., 7.]));
+        let expected = NDTensor::from_array([[1., 3.], [5., 7.]]);
         assert_eq!(tensor_a, expected);
         tensor_a -= tensor_b;
-        let expected = NDTensor::from_vec(&vec!(vec![1., 4.], vec![7., 10.]));
+        let expected = NDTensor::from_array([[1., 4.], [7., 10.]]);
         assert_eq!(tensor_a, expected);
     }
 
@@ -495,8 +518,8 @@ mod tests {
             t1.dot(&t2);
             t1.dot(t2);
         }
-        let tensor_a = NDTensor::from_vec(&vec!(vec![1., 2.], vec![3., 4.]));
-        let tensor_b = NDTensor::from_vec(&vec!(vec![0., -1.], vec![-2., -3.]));
+        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
         some_generic_func(tensor_a, tensor_b);
     }
 }    

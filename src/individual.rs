@@ -231,7 +231,7 @@ mod tests {
 
     use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
     use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
-    use crate::tensor::NDTensor;
+    use crate::tensor::{NDTensor, TensorBase};
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
@@ -265,31 +265,31 @@ mod tests {
         let mut individual = Individual::new(
             vec![
                 Layer{
-                    weights: NDTensor::from_vec(
-                        &vec![
-                            vec![1., 0.],
-                            vec![0., 1.],
+                    weights: NDTensor::from_array(
+                        [
+                            [1., 0.],
+                            [0., 1.],
                         ]
                     ),
-                    biases: NDTensor::from_vec(
-                        &vec![
-                            vec![0.],
-                            vec![0.],
+                    biases: NDTensor::from_array(
+                        [
+                            [0.],
+                            [0.],
                         ]
                     ),
                     activation: Activation::<NDTensor<f64>>::from_name("relu"),
                 },
                 Layer{
-                    weights: NDTensor::from_vec(
-                        &vec![
-                            vec![1., 0.],
-                            vec![0., 1.],
+                    weights: NDTensor::from_array(
+                        [
+                            [1., 0.],
+                            [0., 1.],
                         ]
                     ),
-                    biases: NDTensor::from_vec(
-                        &vec![
-                            vec![0.],
-                            vec![0.],
+                    biases: NDTensor::from_array(
+                        [
+                            [0.],
+                            [0.],
                         ]
                     ),
                     activation: Activation::<NDTensor<f64>>::from_name("relu"),
@@ -297,29 +297,29 @@ mod tests {
             ],
             CostFunction::<NDTensor<f64>>::from_name("quadratic"),
         );
-        let input1 = NDTensor::from_vec(
-            &vec![
-                vec![1., 2.],
-                vec![1., 3.],
+        let input1 = NDTensor::from_array(
+            [
+                [1., 2.],
+                [1., 3.],
             ]
         );
-        let input2 = NDTensor::from_vec(
-            &vec![
-                vec![4., 1.],
-                vec![5., 1.],
+        let input2 = NDTensor::from_array(
+            [
+                [4., 1.],
+                [5., 1.],
             ]
         );
         println!("inputs:\n{}\n{}\n", &input1, &input2);
-        let expected_output1 = NDTensor::from_vec(
-            &vec![
-                vec![10., 5.],
-                vec![1., 5.],
+        let expected_output1 = NDTensor::from_array(
+            [
+                [10., 5.],
+                [1., 5.],
             ]
         );
-        let expected_output2 = NDTensor::from_vec(
-            &vec![
-                vec![5., 10.],
-                vec![4., 1.],
+        let expected_output2 = NDTensor::from_array(
+            [
+                [5., 10.],
+                [4., 1.],
             ]
         );
         println!("output1 before sgd:\n{}\n", individual.forward_pass(&input1));
