@@ -173,9 +173,9 @@ impl<T: Tensor> Individual<T> {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
             // TODO: These operations shall be further simplfied, once
             //       `Mul<TensorOp>` is required for `&TensorOp` (right-hand side being consumed).
-            self.layers[idx].weights -= &weights_update_factor * &nabla_weights[idx];
+            self.layers[idx].weights -= &(weights_update_factor * &nabla_weights[idx]);
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
-            self.layers[idx].biases -= &biases_update_factor * &nabla_biases[idx];
+            self.layers[idx].biases -= &(biases_update_factor * &nabla_biases[idx]);
         }
         if let Some((input, desired_output)) = validation_data {
             trace!("validation error: {}", self.calculate_error(input, desired_output))
@@ -225,29 +225,28 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    use ndarray::array;
+    use ndarray::{array, Array2};
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
     use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
-    use crate::tensor::NDTensor;
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
         let individual_json = r#"{"layers":[
-            {"weights":[[0,1],[2,3]],"biases":[[4],[5]],"activation":"sigmoid"},
-            {"weights":[[0,-1],[-2,-3]],"biases":[[-4],[-5]],"activation":"relu"}
+            {"weights":{"v":1,"dim":[2,2],"data":[0.0,1.0,2.0,3.0]},"biases":{"v":1,"dim":[2,1],"data":[4.0,5.0]}, "activation":"sigmoid"},
+            {"weights":{"v":1,"dim":[2,2],"data":[0.0,-1.0,-2.0,-3.0]},"biases":{"v":1,"dim":[2,1],"data":[-4.0,-5.0]},"activation":"relu"}
         ]}"#;
         let individual_expected = Individual{
             layers: vec![
                 Layer::new(
-                    NDTensor::new(array![[0., 1.], [2., 3.]]),
-                    NDTensor::new(array![[4.], [5.]]),
+                    array![[0., 1.], [2., 3.]],
+                    array![[4.], [5.]],
                     Activation::new("sigmoid", sigmoid, sigmoid_prime),
                 ),
                 Layer::new(
-                    NDTensor::new(array![[0., -1.], [-2., -3.]]),
-                    NDTensor::new(array![[-4.], [-5.]]),
+                    array![[0., -1.], [-2., -3.]],
+                    array![[-4.], [-5.]],
                     Activation::new("relu", relu, relu_prime),
                 ),
             ],
@@ -255,7 +254,7 @@ mod tests {
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
-        let individual_loaded = Individual::<NDTensor<f32>>::from_file(individual_file.path())?;
+        let individual_loaded = Individual::<Array2<f32>>::from_file(individual_file.path())?;
         assert_eq!(individual_expected, individual_loaded);
         return Ok(());
     }

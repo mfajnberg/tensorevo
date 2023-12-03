@@ -153,14 +153,14 @@ pub fn relu_prime_element<TE: TensorElement>(number: TE) -> TE {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tensor::NDTensor;
+    use ndarray::Array2;
 
     mod test_activation {
         use super::*;
 
         #[test]
         fn test_from_name() {
-            let activation: Activation<NDTensor<f64>> = Activation::from_name("relu");
+            let activation: Activation<Array2<f64>> = Activation::from_name("relu");
             let expected_activation = Activation {
                 name: "relu".to_owned(),
                 function: relu,
@@ -171,36 +171,36 @@ mod tests {
 
         #[test]
         fn test_call() {
-            let tensor = NDTensor::from_array([[-1., 2.]]);
+            let tensor = Array2::from_array([[-1., 2.]]);
             let activation = Activation {
                 name: "relu".to_owned(),
                 function: relu,
                 derivative: relu_prime
             };
             let output = activation.call(&tensor);
-            let expected_output = NDTensor::from_array([[0., 2.]]);
+            let expected_output = Array2::from_array([[0., 2.]]);
             assert_eq!(output, expected_output);
         }
 
         #[test]
         fn test_call_derivative() {
-            let tensor = NDTensor::from_array([[-1., 2.]]);
+            let tensor = Array2::from_array([[-1., 2.]]);
             let activation = Activation{
                 name: "relu".to_owned(),
                 function: relu,
                 derivative: relu_prime
             };
             let output = activation.call_derivative(&tensor);
-            let expected_output = NDTensor::from_array([[0., 1.]]);
+            let expected_output = Array2::from_array([[0., 1.]]);
             assert_eq!(output, expected_output);
         }
     }
 
     #[test]
     fn test_sigmoid_inplace() {
-        let mut tensor = NDTensor::from_array([[0., 36.]]);
+        let mut tensor = Array2::from_array([[0., 36.]]);
         sigmoid_inplace(&mut tensor);
-        let expected_tensor = NDTensor::from_array([[0.5, 0.9999999999999998]]);
+        let expected_tensor = Array2::from_array([[0.5, 0.9999999999999998]]);
         assert_eq!(tensor, expected_tensor);
     }
 }

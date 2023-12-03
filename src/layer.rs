@@ -26,31 +26,33 @@ impl<T: Tensor> Layer<T> {
 
 #[cfg(test)]
 mod tests {
+    use ndarray::Array2;
+
     use super::*;
-    use crate::tensor::{NDTensor, TensorBase};
+    use crate::tensor::TensorBase;
 
     #[test]
     fn test() {
-        let input = NDTensor::from_array(
+        let input = Array2::from_array(
             [
                 [1.],
                 [1.],
             ]
         );
         let layer = Layer{
-            weights: NDTensor::from_array(
+            weights: Array2::from_array(
                 [
                     [1., 0.],
                     [0., 1.],
                 ]
             ),
-            biases: NDTensor::from_array(
+            biases: Array2::from_array(
                 [
                     [-1.],
                     [-1.],
                 ]
             ),
-            activation: Activation::<NDTensor<f64>>::from_name("sigmoid"),
+            activation: Activation::<Array2<f64>>::from_name("sigmoid"),
         };
         let (z, a) = layer.feed_forward(&input);
         println!("{}", z);

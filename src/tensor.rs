@@ -1,12 +1,12 @@
 //! Definitions of the `Tensor` and `TensorElement` trait and the `NDTensor` reference implementation.
 
-use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::fmt::{Debug, Display};
 use std::iter::Sum;
 use std::ops;
 
 use ndarray::{Array2, Axis};
 use num_traits::{Float, FromPrimitive};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
 
 
@@ -106,14 +106,14 @@ where
         TensorBase +
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
-        ops::AddAssign +
         ops::AddAssign<&'a Self> +
-        ops::DivAssign +
+        ops::Add<&'a Self, Output = Self> +
         ops::DivAssign<&'a Self> +
-        ops::MulAssign +
+        ops::Div<&'a Self, Output = Self> +
         ops::MulAssign<&'a Self> +
-        ops::SubAssign +
-        ops::SubAssign<&'a Self>,
+        ops::Mul<&'a Self, Output = Self> +
+        ops::SubAssign<&'a Self> +
+        ops::Sub<&'a Self, Output = Self>,
     for<'a> &'a Self:
         ops::Add<Output = Self> +
         ops::Div<Output = Self> +
@@ -142,241 +142,101 @@ where
 }
 
 
-/// Reference `Tensor` implementation using `ndarray` data structures
-///
-/// Data is currently always stored as a 2D array!
-#[derive(Clone, Debug, PartialEq)]
-pub struct NDTensor<TE: TensorElement> {
-    // https://docs.rs/ndarray/latest/ndarray/type.Array2.html
-    data: Array2<TE>,
-}
 
-
-/// Custom `NDTensor`-specific methods not defined on the `Tensor` trait.
-impl<TE: TensorElement> NDTensor<TE> {
-    /// Simple constructor to directly pass the data as an `ndarray`.
-    pub fn new(data: Array2<TE>) -> Self {
-        return Self{data}
-    }
-    
-    /// Constructs a new `NDTensor` from an iterator of iterators.
-    fn from_iter<I, J>(i: I) -> Self
-    where
-        I: IntoIterator<Item = J>,
-        J: IntoIterator<Item = TE>,
-    {
-        let mut data = Vec::new();
-        let mut num_rows: usize = 0;
-        let mut num_columns: Option<usize> = None;
-        for row in i {
-            num_rows += 1;
-            let row_vec: Vec<TE> = row.into_iter().collect();
-            match num_columns {
-                Some(n) => {
-                    if n != row_vec.len() { panic!() }
-                },
-                None => num_columns = Some(row_vec.len()),
-            }
-            data.extend_from_slice(&row_vec);
+// TEMP.
+fn array2_from_iter<I, J, TE>(i: I) -> Array2<TE>
+where
+    I: IntoIterator<Item = J>,
+    J: IntoIterator<Item = TE>,
+    TE: TensorElement,
+{
+    let mut data = Vec::new();
+    let mut num_rows: usize = 0;
+    let mut num_columns: Option<usize> = None;
+    for row in i {
+        num_rows += 1;
+        let row_vec: Vec<TE> = row.into_iter().collect();
+        match num_columns {
+            Some(n) => {
+                if n != row_vec.len() { panic!() }
+            },
+            None => num_columns = Some(row_vec.len()),
         }
-        return Self::new(
-            Array2::from_shape_vec((num_rows, num_columns.unwrap_or(0)), data).unwrap()
-        );
+        data.extend_from_slice(&row_vec);
     }
+    return Array2::from_shape_vec((num_rows, num_columns.unwrap_or(0)), data).unwrap();
 }
 
 
-/// Allows `serde` to deserialize to `NDTensor` objects.
-impl<'de, TE: TensorElement> Deserialize<'de> for NDTensor<TE> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        return deserialize_to_tensor(deserializer);
-    }
-}
-
-
-/// Allows `serde` to serialize `NDTensor` objects.
-impl<TE: TensorElement> Serialize for NDTensor<TE> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let vec = &self.to_vec();
-        return vec.serialize(serializer);
-    }
-}
-
-
-/// Generic implementation of `Tensor` for `NDTensor` in terms of any `TensorElement`.
-impl<TE: TensorElement> TensorBase for NDTensor<TE> {
+impl<TE: TensorElement> TensorBase for Array2<TE> {
     type Element = TE;
 
     fn from_array<const M: usize, const N: usize>(a: [[TE; N]; M]) -> Self {
-        return Self::from_iter(a);
+        array2_from_iter(a)
     }
 
     fn from_vec(v: Vec<Vec<Self::Element>>) -> Self {
-        return Self::from_iter(v);
+        array2_from_iter(v)
     }
 
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self {
-        return Self {data: Array2::<TE>::from_elem(shape, num)};
+        Self::from_elem(shape, num)
     }
     
     fn zeros(shape: (usize, usize)) -> Self {
-        return Self {data: Array2::<TE>::zeros(shape)}
+        Self::zeros(shape)
     }
     
     fn shape(&self) -> (usize, usize) {
-        return self.data.dim();
+        self.dim()
     }
     
     fn to_vec(&self) -> Vec<Vec<Self::Element>> {
         let mut output = Vec::<Vec<Self::Element>>::new();
-        for row in (self.data).rows() {
+        for row in self.rows() {
             output.push(row.to_vec());
         }
         return output;
     }
 
     fn transpose(&self) -> Self {
-        return Self {data: self.data.t().to_owned()}
+        self.t().to_owned()
     }
 
     fn map<F>(&self, f: F) -> Self
     where F: FnMut(TE) -> TE {
-        return Self {data: self.data.mapv(f)}
+        self.mapv(f)
     }
 
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(TE) -> TE {
-        self.data.mapv_inplace(f)
+        self.mapv_inplace(f)
     }
 
     fn vec_norm(&self) -> Self::Element {
-        return self.data.iter().map(|x| x.powi(2)).sum::<Self::Element>().sqrt();
+        self.iter().map(|x| x.powi(2)).sum::<Self::Element>().sqrt()
     }
 
     fn sum_axis(&self, axis: usize) -> Self {
-        return Self {data: self.data.sum_axis(Axis(axis)).insert_axis(Axis(axis))};
+        self.sum_axis(Axis(axis)).insert_axis(Axis(axis))
     }
 }
 
 
-/// Allow printing `NDTensor` objects via `{}`
-impl<TE: TensorElement> Display for NDTensor<TE> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        return write!(f, "{}", self.data);
-    }
-}
-
-
-impl<TE: TensorElement> Dot for NDTensor<TE> {
+impl<TE: TensorElement> Dot for Array2<TE> {
     type Output = Self;
 
     fn dot(&self, rhs: Self) -> Self::Output {
-        Self {data: self.data.dot(&rhs.data)}
+        self.dot(&rhs)
     }
 }
 
 
-impl<TE: TensorElement> Dot<&NDTensor<TE>> for NDTensor<TE> {
+impl<TE: TensorElement> Dot<&Array2<TE>> for Array2<TE> {
     type Output = Self;
 
     fn dot(&self, rhs: &Self) -> Self::Output {
-        Self {data: self.data.dot(&rhs.data)}
-    }
-}
-
-
-// Arithmetic trait implementations from `std::ops`.
-// TODO: Write a macro for those.
-
-
-impl<TE: TensorElement> ops::Add for &NDTensor<TE> {
-    type Output = NDTensor<TE>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        NDTensor {data: &self.data + &rhs.data}
-    }
-}
-
-
-impl<TE: TensorElement> ops::AddAssign for NDTensor<TE> {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = NDTensor {data: &self.data + &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::AddAssign<&NDTensor<TE>> for NDTensor<TE> {
-    fn add_assign(&mut self, rhs: &Self) {
-        *self = NDTensor {data: &self.data + &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::Div for &NDTensor<TE> {
-    type Output = NDTensor<TE>;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        NDTensor {data: &self.data / &rhs.data}
-    }
-}
-
-
-impl<TE: TensorElement> ops::DivAssign for NDTensor<TE> {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = NDTensor {data: &self.data / &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::DivAssign<&NDTensor<TE>> for NDTensor<TE> {
-    fn div_assign(&mut self, rhs: &Self) {
-        *self = NDTensor {data: &self.data / &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::Mul for &NDTensor<TE> {
-    type Output = NDTensor<TE>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        NDTensor {data: &self.data * &rhs.data}
-    }
-}
-
-
-impl<TE: TensorElement> ops::MulAssign for NDTensor<TE> {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = NDTensor {data: &self.data * &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::MulAssign<&NDTensor<TE>> for NDTensor<TE> {
-    fn mul_assign(&mut self, rhs: &Self) {
-        *self = NDTensor {data: &self.data * &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::Sub for &NDTensor<TE> {
-    type Output = NDTensor<TE>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        NDTensor {data: &self.data - &rhs.data}
-    }
-}
-
-
-impl<TE: TensorElement> ops::SubAssign for NDTensor<TE> {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = NDTensor {data: &self.data - &rhs.data};
-    }
-}
-
-
-impl<TE: TensorElement> ops::SubAssign<&NDTensor<TE>> for NDTensor<TE> {
-    fn sub_assign(&mut self, rhs: &Self) {
-        *self = NDTensor {data: &self.data - &rhs.data};
+        self.dot(rhs)
     }
 }
 
@@ -398,116 +258,32 @@ mod tests {
     
         #[test]
         fn test_map() {
-            let tensor = NDTensor::from_array([[0., 1.], [2., 3.]]);
-            let result = tensor.map(double);
-            let expected = NDTensor::from_array([[0., 2.], [4., 6.]]);
+            let tensor = Array2::from_array([[0., 1.], [2., 3.]]);
+            let result = TensorBase::map(&tensor, double);
+            let expected = Array2::from_array([[0., 2.], [4., 6.]]);
             assert_eq!(result, expected);
         }
-    
+
         #[test]
         fn test_map_inplace() {
-            let mut tensor = NDTensor::from_array([[0., -2.], [4., -6.]]);
-            tensor.map_inplace(halve);
-            let expected = NDTensor::from_array([[0., -1.], [2., -3.]]);
+            let mut tensor = Array2::from_array([[0., -2.], [4., -6.]]);
+            TensorBase::map_inplace(&mut tensor, halve);
+            let expected = Array2::from_array([[0., -1.], [2., -3.]]);
             assert_eq!(tensor, expected);
         }
     
         #[test]
         fn test_dot() {
-            let tensor_a = NDTensor::from_array([[0., 1., 2.], [3., 2., 1.]]);
-            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
-            let result = tensor_a.dot(tensor_b);
-            let expected = NDTensor::from_array([[-5., -2.], [-10., -10.]]);
+            let tensor_a = Array2::from_array([[0., 1., 2.], [3., 2., 1.]]);
+            let tensor_b = Array2::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
+            let result = Dot::dot(&tensor_a, tensor_b);
+            let expected = Array2::from_array([[-5., -2.], [-10., -10.]]);
             assert_eq!(result, expected);
             let result2 = result.dot(&result);
-            let expected2 = NDTensor::from_array([[45., 30.], [150., 120.]]);
+            let expected2 = Array2::from_array([[45., 30.], [150., 120.]]);
             assert_eq!(result2, expected2);
         }
-    
-        #[test]
-        fn test_add() {
-            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-            let result = &tensor_a + &tensor_b;
-            let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
-            assert_eq!(result, expected);
-        }
-    
-        #[test]
-        fn test_add_assign() {
-            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-            tensor_a += &tensor_b;
-            let expected = NDTensor::from_array([[1., 1.], [1., 1.]]);
-            assert_eq!(tensor_a, expected);
-            tensor_a += tensor_b;
-            let expected = NDTensor::from_array([[1., 0.], [-1., -2.]]);
-            assert_eq!(tensor_a, expected);
-        }
-    
-        #[test]
-        fn test_div() {
-            let tensor_a = NDTensor::from_array([[2., 4.], [6., 8.]]);
-            let tensor_b = NDTensor::from_array([[2., -1.], [-2., -4.]]);
-            let result = &tensor_a / &tensor_b;
-            let expected = NDTensor::from_array([[1., -4.], [-3., -2.]]);
-            assert_eq!(result, expected);
-        }
-
-        #[test]
-        fn test_div_assign() {
-            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[1., -1.], [-1., -2.]]);
-            tensor_a /= &tensor_b;
-            let expected = NDTensor::from_array([[1., -2.], [-3., -2.]]);
-            assert_eq!(tensor_a, expected);
-            tensor_a /= tensor_b;
-            let expected = NDTensor::from_array([[1., 2.], [3., 1.]]);
-            assert_eq!(tensor_a, expected);
-        }
-    
-        #[test]
-        fn test_mul() {
-            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
-            let result = &tensor_a * &tensor_b;
-            let expected = NDTensor::from_array([[-1., -4.], [-9., -16.]]);
-            assert_eq!(result, expected);
-        }
-    
-        #[test]
-        fn test_mul_assign() {
-            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-            tensor_a *= &tensor_b;
-            let expected = NDTensor::from_array([[0., -2.], [-6., -12.]]);
-            assert_eq!(tensor_a, expected);
-            tensor_a *= tensor_b;
-            let expected = NDTensor::from_array([[0., 2.], [12., 36.]]);
-            assert_eq!(tensor_a, expected);
-        }
-    
-        #[test]
-        fn test_sub() {
-            let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[-1., -2.], [-3., -4.]]);
-            let result = &tensor_a - &tensor_b;
-            let expected = NDTensor::from_array([[2., 4.], [6., 8.]]);
-            assert_eq!(result, expected);
-        }
-
-        #[test]
-        fn test_sub_assign() {
-            let mut tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-            let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
-            tensor_a -= &tensor_b;
-            let expected = NDTensor::from_array([[1., 3.], [5., 7.]]);
-            assert_eq!(tensor_a, expected);
-            tensor_a -= tensor_b;
-            let expected = NDTensor::from_array([[1., 4.], [7., 10.]]);
-            assert_eq!(tensor_a, expected);
-        }
-    }    
+    }
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// Also tests that `NDTensor` fully implements `TensorOp`.
@@ -519,19 +295,15 @@ mod tests {
             t1 /= &t2;
             t1 *= &t2;
             t1 -= &t2;
-            let t5 = &t1 + &t2;
-            let t6 = &t1 - &t2;
-            let t7 = &t1 * &t2;
-            let t8 = &t1 / &t2;
-            t1 += t5;
-            t1 += t6;
-            t1 += t7;
-            t1 += t8;
+            let _t5 = &t1 + &t2;
+            let _t6 = &t1 - &t2;
+            let _t7 = &t1 * &t2;
+            let _t8 = &t1 / &t2;
             t1.dot(&t2);
             t1.dot(t2);
         }
-        let tensor_a = NDTensor::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = NDTensor::from_array([[0., -1.], [-2., -3.]]);
+        let tensor_a = Array2::from_array([[1., 2.], [3., 4.]]);
+        let tensor_b = Array2::from_array([[0., -1.], [-2., -3.]]);
         some_generic_func(tensor_a, tensor_b);
     }
 }    
