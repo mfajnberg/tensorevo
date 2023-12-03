@@ -1,4 +1,4 @@
-//! Definitions of the `Tensor` and `TensorElement` trait and the `NDTensor` reference implementation.
+//! Definitions of the `Tensor` and `TensorElement` trait.
 
 use std::fmt::{Debug, Display};
 use std::iter::Sum;
@@ -6,7 +6,7 @@ use std::ops;
 
 use ndarray::{Array2, Axis};
 use num_traits::{Float, FromPrimitive};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 
@@ -54,12 +54,6 @@ pub trait TensorBase:
     //       https://github.com/mfajnberg/tensorevo/issues/5
 {
     type Element: TensorElement;  // associated type must implement the `TensorElement` trait
-    
-    /// Creates a `Tensor` from an array of arrays of `TensorElement`
-    fn from_array<const M: usize, const N: usize>(a: [[Self::Element; N]; M]) -> Self;
-
-    /// Creates a `Tensor` from a vector of vectors of `TensorElement`
-    fn from_vec(v: Vec<Vec<Self::Element>>) -> Self;
     
     /// Creates a `Tensor` from a number
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self;
@@ -127,57 +121,8 @@ pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
 pub trait Tensor = TensorOp + TensorSerde;
 
 
-/// Takes a serde `Deserializer` and constructs a `Tensor` object from it.
-///
-/// Until we can do `impl<T> Deserialize for T where T: Tensor`,
-/// we need this function as a workaround to use in concrete implementations
-/// of `Tensor` (see `Deserialize` implementation for `NDTensor` below).
-pub fn deserialize_to_tensor<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: TensorBase,
-{
-    let v = Vec::<Vec<T::Element>>::deserialize(deserializer)?;
-    return Ok(T::from_vec(v));
-}
-
-
-
-// TEMP.
-fn array2_from_iter<I, J, TE>(i: I) -> Array2<TE>
-where
-    I: IntoIterator<Item = J>,
-    J: IntoIterator<Item = TE>,
-    TE: TensorElement,
-{
-    let mut data = Vec::new();
-    let mut num_rows: usize = 0;
-    let mut num_columns: Option<usize> = None;
-    for row in i {
-        num_rows += 1;
-        let row_vec: Vec<TE> = row.into_iter().collect();
-        match num_columns {
-            Some(n) => {
-                if n != row_vec.len() { panic!() }
-            },
-            None => num_columns = Some(row_vec.len()),
-        }
-        data.extend_from_slice(&row_vec);
-    }
-    return Array2::from_shape_vec((num_rows, num_columns.unwrap_or(0)), data).unwrap();
-}
-
-
 impl<TE: TensorElement> TensorBase for Array2<TE> {
     type Element = TE;
-
-    fn from_array<const M: usize, const N: usize>(a: [[TE; N]; M]) -> Self {
-        array2_from_iter(a)
-    }
-
-    fn from_vec(v: Vec<Vec<Self::Element>>) -> Self {
-        array2_from_iter(v)
-    }
 
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self {
         Self::from_elem(shape, num)
@@ -243,9 +188,11 @@ impl<TE: TensorElement> Dot<&Array2<TE>> for Array2<TE> {
 
 #[cfg(test)]
 mod tests {
+    use ndarray::array;
+
     use super::*;
 
-    mod test_ndtensor {
+    mod test_tensor_ndarray {
         use super::*;
 
         fn double<TE: TensorElement>(x: TE) -> TE {
@@ -258,35 +205,35 @@ mod tests {
     
         #[test]
         fn test_map() {
-            let tensor = Array2::from_array([[0., 1.], [2., 3.]]);
+            let tensor = array![[0., 1.], [2., 3.]];
             let result = TensorBase::map(&tensor, double);
-            let expected = Array2::from_array([[0., 2.], [4., 6.]]);
+            let expected = array![[0., 2.], [4., 6.]];
             assert_eq!(result, expected);
         }
 
         #[test]
         fn test_map_inplace() {
-            let mut tensor = Array2::from_array([[0., -2.], [4., -6.]]);
+            let mut tensor = array![[0., -2.], [4., -6.]];
             TensorBase::map_inplace(&mut tensor, halve);
-            let expected = Array2::from_array([[0., -1.], [2., -3.]]);
+            let expected = array![[0., -1.], [2., -3.]];
             assert_eq!(tensor, expected);
         }
     
         #[test]
         fn test_dot() {
-            let tensor_a = Array2::from_array([[0., 1., 2.], [3., 2., 1.]]);
-            let tensor_b = Array2::from_array([[-1., -2.], [-3., -2.], [-1., 0.]]);
+            let tensor_a = array![[0., 1., 2.], [3., 2., 1.]];
+            let tensor_b = array![[-1., -2.], [-3., -2.], [-1., 0.]];
             let result = Dot::dot(&tensor_a, tensor_b);
-            let expected = Array2::from_array([[-5., -2.], [-10., -10.]]);
+            let expected = array![[-5., -2.], [-10., -10.]];
             assert_eq!(result, expected);
             let result2 = result.dot(&result);
-            let expected2 = Array2::from_array([[45., 30.], [150., 120.]]);
+            let expected2 = array![[45., 30.], [150., 120.]];
             assert_eq!(result2, expected2);
         }
     }
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
-    /// Also tests that `NDTensor` fully implements `TensorOp`.
+    /// Also tests that `Array2` fully implements `TensorOp`.
     /// Only for the compiler, doesn't need to be executed as a test.
     #[allow(dead_code)]
     fn test_tensor_op() {
@@ -302,8 +249,8 @@ mod tests {
             t1.dot(&t2);
             t1.dot(t2);
         }
-        let tensor_a = Array2::from_array([[1., 2.], [3., 4.]]);
-        let tensor_b = Array2::from_array([[0., -1.], [-2., -3.]]);
+        let tensor_a = array![[1., 2.], [3., 4.]];
+        let tensor_b = array![[0., -1.], [-2., -3.]];
         some_generic_func(tensor_a, tensor_b);
     }
 }    

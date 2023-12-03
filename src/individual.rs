@@ -124,6 +124,8 @@ impl<T: Tensor> Individual<T> {
     fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T,) -> (Vec<T>, Vec<T>) {
         let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
         let num_layers = self.layers.len();
+        // TODO: Use `Vec::with_capacity` and try to avoid the placeholder data.
+        //       https://github.com/mfajnberg/tensorevo/issues/19
         let mut nabla_weights = Vec::<T>::new();
         let mut nabla_biases = Vec::<T>::new();
         for layer in &self.layers {
@@ -133,13 +135,13 @@ impl<T: Tensor> Individual<T> {
         // Go backwards
         let cost_derivative = self.cost_function.call_derivative(activations.last().unwrap(), batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
-        let mut delta = &cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        let mut delta = cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
         nabla_weights[num_layers - 1] = delta.dot(activations[num_layers - 2].transpose());
         nabla_biases[num_layers - 1] = delta.sum_axis(1);
         for layer_num in (0..num_layers - 1).rev() {
             let weighted_input = &weighted_inputs[layer_num];
             let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
-            delta = &self.layers[layer_num + 1].weights.transpose().dot(delta) * &sp;
+            delta = self.layers[layer_num + 1].weights.transpose().dot(delta) * &sp;
             if layer_num > 0 {
                 nabla_weights[layer_num] = delta.dot(activations[layer_num - 1].transpose());
             } else { // activation of input layer == input
@@ -171,8 +173,6 @@ impl<T: Tensor> Individual<T> {
         let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs);
         for idx in 0..num_layers {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
-            // TODO: These operations shall be further simplfied, once
-            //       `Mul<TensorOp>` is required for `&TensorOp` (right-hand side being consumed).
             self.layers[idx].weights -= &(weights_update_factor * &nabla_weights[idx]);
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
             self.layers[idx].biases -= &(biases_update_factor * &nabla_biases[idx]);
@@ -225,7 +225,7 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    use ndarray::{array, Array2};
+    use ndarray::array;
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
@@ -233,9 +233,17 @@ mod tests {
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
-        let individual_json = r#"{"layers":[
-            {"weights":{"v":1,"dim":[2,2],"data":[0.0,1.0,2.0,3.0]},"biases":{"v":1,"dim":[2,1],"data":[4.0,5.0]}, "activation":"sigmoid"},
-            {"weights":{"v":1,"dim":[2,2],"data":[0.0,-1.0,-2.0,-3.0]},"biases":{"v":1,"dim":[2,1],"data":[-4.0,-5.0]},"activation":"relu"}
+        let individual_json = r#"{"layers": [
+            {
+                "weights":    {"v": 1, "dim": [2,2], "data": [0.0,1.0,2.0,3.0]},
+                "biases":     {"v": 1, "dim": [2,1], "data": [4.0,5.0]},
+                "activation": "sigmoid"
+            },
+            {
+                "weights":    {"v": 1, "dim": [2,2], "data": [0.0,-1.0,-2.0,-3.0]},
+                "biases":     {"v": 1, "dim": [2,1], "data": [-4.0,-5.0]},
+                "activation": "relu"
+            }
         ]}"#;
         let individual_expected = Individual{
             layers: vec![
@@ -254,7 +262,7 @@ mod tests {
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
-        let individual_loaded = Individual::<Array2<f32>>::from_file(individual_file.path())?;
+        let individual_loaded = Individual::from_file(individual_file.path())?;
         assert_eq!(individual_expected, individual_loaded);
         return Ok(());
     }

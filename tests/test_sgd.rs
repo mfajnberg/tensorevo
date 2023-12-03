@@ -10,54 +10,46 @@ fn test_sgd() {
     let mut individual = Individual::new(
         vec![
             Layer{
-                weights: array!
-                    [
-                        [1., 0.],
-                        [0., 1.],
-                    ],
-                biases: array!
-                    [
-                        [0.],
-                        [0.],
-                    ],
+                weights: array![
+                    [1., 0.],
+                    [0., 1.],
+                ],
+                biases: array![
+                    [0.],
+                    [0.],
+                ],
                 activation: Activation::from_name("relu"),
             },
             Layer{
-                weights: array!
-                    [
-                        [1., 0.],
-                        [0., 1.],
-                    ],
-                biases: array!
-                    [
-                        [0.],
-                        [0.],
-                    ],
+                weights: array![
+                    [1., 0.],
+                    [0., 1.],
+                ],
+                biases: array![
+                    [0.],
+                    [0.],
+                ],
                 activation: Activation::from_name("relu"),
             },
         ],
         CostFunction::<Array2<f64>>::from_name("quadratic"),
     );
-    let input1 = array!
-        [
-            [1., 2.],
-            [1., 3.],
-        ];
-    let input2 = array!
-        [
-            [4., 1.],
-            [5., 1.],
-        ];
-    let desired_output_1 = array!
-        [
-            [10., 5.],
-            [1., 5.],
-        ];
-    let desired_output_2 = array!
-        [
-            [5., 10.],
-            [4., 1.],
-        ];
+    let input1 = array![
+        [1., 2.],
+        [1., 3.],
+    ];
+    let input2 = array![
+        [4., 1.],
+        [5., 1.],
+    ];
+    let desired_output_1 = array![
+        [10., 5.],
+        [1., 5.],
+    ];
+    let desired_output_2 = array![
+        [5., 10.],
+        [4., 1.],
+    ];
     let training_data = vec![
         (&input1, &desired_output_1),
         (&input2, &desired_output_2),
