@@ -22,11 +22,11 @@ pub trait Pow {
     /// Result type of the exponentiation.
     type Output;
 
-    /// Raises `self` to the power of `rhs` (floating point number).
-    fn powf(&self, rhs: impl Float) -> Self::Output;
+    /// Raises `self` to the power of `exponent` (floating point number).
+    fn powf(&self, exponent: impl Float) -> Self::Output;
 
-    /// Raises `self` to the power of `rhs` (integer).
-    fn powi(&self, rhs: i32) -> Self::Output;
+    /// Raises `self` to the power of `exponent` (integer).
+    fn powi(&self, exponent: i32) -> Self::Output;
 
     /// Returns the square root of `self`.
     fn sqrt(&self) -> Self::Output {
@@ -49,12 +49,12 @@ impl<F: Float> Exp for F {
 impl<F: Float> Pow for F {
     type Output = Self;
 
-    fn powf(&self, rhs: impl Float) -> Self::Output {
-        F::powf(*self, F::from(rhs).unwrap())
+    fn powf(&self, exponent: impl Float) -> Self::Output {
+        F::powf(*self, F::from(exponent).unwrap())
     }
 
-    fn powi(&self, rhs: i32) -> Self::Output {
-        F::powi(*self, rhs)
+    fn powi(&self, exponent: i32) -> Self::Output {
+        F::powi(*self, exponent)
     }
 
     /// Returns the square root of `self` via the provided `Float::sqrt` method.
