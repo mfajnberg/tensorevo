@@ -114,6 +114,7 @@ mod tests {
         let exponent = 0.;
         let result = Exp::exp(&exponent);
         assert_eq!(result, 1.);
+
         let exponent = 1.;
         let result = Exp::exp(&exponent);
         assert_eq!(result, 2.718281828459045);
@@ -124,8 +125,10 @@ mod tests {
         let base = 8.;
         let result = Pow::powi(&base, 2);
         assert_eq!(result, 64.);
+
         let result = Pow::powf(&base, 1./3.);
         assert_eq!(result, 2.);
+
         let base = 64.;
         let result = Pow::sqrt(&base);
         assert_eq!(result, 8.);
