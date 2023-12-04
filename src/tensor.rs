@@ -55,12 +55,13 @@ pub trait TensorBase:
 {
     type Element: TensorElement;  // associated type must implement the `TensorElement` trait
     
+    /// Creates a `Tensor` with only zeros given a 2d shape
+    fn zeros(shape: (usize, usize)) -> Self {
+        Self::from_num(Self::Element::from_usize(0).unwrap(), shape)
+    }
+    
     /// Creates a `Tensor` from a number
     fn from_num(num: Self::Element, shape: (usize, usize)) -> Self;
-    
-    /// Creates a `Tensor` with only zeros given a 2d shape
-    // TODO: Provide a default implementation using `from_num`.
-    fn zeros(shape: (usize, usize)) -> Self;
     
     /// Returns the 2d shape of self as a tuple
     fn shape(&self) -> (usize, usize);
@@ -128,10 +129,6 @@ impl<TE: TensorElement> TensorBase for Array2<TE> {
         Self::from_elem(shape, num)
     }
     
-    fn zeros(shape: (usize, usize)) -> Self {
-        Self::zeros(shape)
-    }
-    
     fn shape(&self) -> (usize, usize) {
         self.dim()
     }
@@ -158,6 +155,8 @@ impl<TE: TensorElement> TensorBase for Array2<TE> {
         self.mapv_inplace(f)
     }
 
+    // TODO: Define separate `Norm` trait
+    //       https://github.com/mfajnberg/tensorevo/issues/20
     fn vec_norm(&self) -> Self::Element {
         self.iter().map(|x| x.powi(2)).sum::<Self::Element>().sqrt()
     }
@@ -195,16 +194,49 @@ mod tests {
     mod test_tensor_ndarray {
         use super::*;
 
-        fn double<TE: TensorElement>(x: TE) -> TE {
-            return x * TE::from_usize(2).unwrap();
+        #[test]
+        fn test_zeros() {
+            let tensor: Array2<f32> = TensorBase::zeros((1, 3));
+            let expected = array![[0., 0., 0.]];
+            assert_eq!(tensor, expected);
         }
-    
-        fn halve<TE: TensorElement>(x: TE) -> TE {
-            return x / TE::from_usize(2).unwrap();
+
+        #[test]
+        fn test_from_num() {
+            let tensor = Array2::from_num(3.14, (2, 2));
+            let expected = array![[3.14, 3.14], [3.14, 3.14]];
+            assert_eq!(tensor, expected);
         }
-    
+
+        #[test]
+        fn test_shape() {
+            let tensor = array![[0., 1., 2.], [3., 4., 5.]];
+            let shape = TensorBase::shape(&tensor);
+            assert_eq!(shape, (2, 3));
+        }
+
+        #[test]
+        fn test_to_vec() {
+            let tensor = array![[0., 1., 2.], [3., 4., 5.]];
+            let vector = tensor.to_vec();
+            let expected = vec![[0., 1., 2.], [3., 4., 5.]];
+            assert_eq!(vector, expected);
+        }
+
+        #[test]
+        fn test_transpose() {
+            let tensor = array![[0., 1., 2.], [3., 4., 5.]];
+            let result = tensor.transpose();
+            let expected = array![[0., 3.], [1., 4.], [2., 5.]];
+            assert_eq!(result, expected);
+        }
+
         #[test]
         fn test_map() {
+            fn double<TE: TensorElement>(x: TE) -> TE {
+                return x * TE::from_usize(2).unwrap();
+            }
+    
             let tensor = array![[0., 1.], [2., 3.]];
             let result = TensorBase::map(&tensor, double);
             let expected = array![[0., 2.], [4., 6.]];
@@ -213,23 +245,38 @@ mod tests {
 
         #[test]
         fn test_map_inplace() {
+            fn halve<TE: TensorElement>(x: TE) -> TE {
+                return x / TE::from_usize(2).unwrap();
+            }
+    
             let mut tensor = array![[0., -2.], [4., -6.]];
             TensorBase::map_inplace(&mut tensor, halve);
             let expected = array![[0., -1.], [2., -3.]];
             assert_eq!(tensor, expected);
         }
-    
+
         #[test]
-        fn test_dot() {
-            let tensor_a = array![[0., 1., 2.], [3., 2., 1.]];
-            let tensor_b = array![[-1., -2.], [-3., -2.], [-1., 0.]];
-            let result = Dot::dot(&tensor_a, tensor_b);
-            let expected = array![[-5., -2.], [-10., -10.]];
+        fn test_sum_axis() {
+            let tensor = array![[0., 1., 2.], [3., 4., 5.]];
+            let result = TensorBase::sum_axis(&tensor, 0);
+            let expected = array![[3., 5., 7.]];
             assert_eq!(result, expected);
-            let result2 = result.dot(&result);
-            let expected2 = array![[45., 30.], [150., 120.]];
-            assert_eq!(result2, expected2);
+            let result = TensorBase::sum_axis(&tensor, 1);
+            let expected = array![[3.], [12.]];
+            assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn test_dot_array() {
+        let tensor_a = array![[0., 1., 2.], [3., 2., 1.]];
+        let tensor_b = array![[-1., -2.], [-3., -2.], [-1., 0.]];
+        let result = Dot::dot(&tensor_a, tensor_b);
+        let expected = array![[-5., -2.], [-10., -10.]];
+        assert_eq!(result, expected);
+        let result2 = Dot::dot(&result, &result);
+        let expected2 = array![[45., 30.], [150., 120.]];
+        assert_eq!(result2, expected2);
     }
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
