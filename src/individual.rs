@@ -95,6 +95,8 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// Two vectors of 2d-tensors of intermediate training data.
     fn get_weighted_inputs_and_activations(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
+        // TODO: Use `Vec::with_capacity`.
+        //       https://github.com/mfajnberg/tensorevo/issues/19
         let mut weighted_inputs = Vec::<T>::new();
         let mut activation: T = batch_inputs.clone();
         let mut activations = Vec::<T>::new();
@@ -135,13 +137,13 @@ impl<T: Tensor> Individual<T> {
         // Go backwards
         let cost_derivative = self.cost_function.call_derivative(activations.last().unwrap(), batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
-        let mut delta = cost_derivative * &self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        let mut delta = cost_derivative * self.layers[num_layers - 1].activation.call_derivative(weighted_input);
         nabla_weights[num_layers - 1] = delta.dot(activations[num_layers - 2].transpose());
         nabla_biases[num_layers - 1] = delta.sum_axis(1);
         for layer_num in (0..num_layers - 1).rev() {
             let weighted_input = &weighted_inputs[layer_num];
             let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
-            delta = self.layers[layer_num + 1].weights.transpose().dot(delta) * &sp;
+            delta = self.layers[layer_num + 1].weights.transpose().dot(delta) * sp;
             if layer_num > 0 {
                 nabla_weights[layer_num] = delta.dot(activations[layer_num - 1].transpose());
             } else { // activation of input layer == input

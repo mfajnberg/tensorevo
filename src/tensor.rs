@@ -102,18 +102,26 @@ where
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
         ops::AddAssign<&'a Self> +
+        ops::Add<Output = Self> +
         ops::Add<&'a Self, Output = Self> +
         ops::DivAssign<&'a Self> +
+        ops::Div<Output = Self> +
         ops::Div<&'a Self, Output = Self> +
         ops::MulAssign<&'a Self> +
+        ops::Mul<Output = Self> +
         ops::Mul<&'a Self, Output = Self> +
         ops::SubAssign<&'a Self> +
+        ops::Sub<Output = Self> +
         ops::Sub<&'a Self, Output = Self>,
     for<'a> &'a Self:
         ops::Add<Output = Self> +
+        ops::Add<Self, Output = Self> +
         ops::Div<Output = Self> +
+        ops::Div<Self, Output = Self> +
         ops::Mul<Output = Self> +
-        ops::Sub<Output = Self>;
+        ops::Mul<Self, Output = Self> +
+        ops::Sub<Output = Self> +
+        ops::Sub<Self, Output = Self>;
 
 
 pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
@@ -289,10 +297,26 @@ mod tests {
             t1 /= &t2;
             t1 *= &t2;
             t1 -= &t2;
-            let _t5 = &t1 + &t2;
-            let _t6 = &t1 - &t2;
-            let _t7 = &t1 * &t2;
-            let _t8 = &t1 / &t2;
+            // Borrow x Borrow:
+            let t5 = &t1 + &t2;
+            let t6 = &t1 - &t2;
+            let t7 = &t1 * &t2;
+            let t8 = &t1 / &t2;
+            // Borrow x Move:
+            let t9  = &t1 + t5.clone();
+            let t10 = &t1 - t6.clone();
+            let t11 = &t1 * t7.clone();
+            let t12 = &t1 / t8.clone();
+            // Move x Borrow:
+            let t13 = t5 + &t2;
+            let t14 = t6 - &t2;
+            let t15 = t7 * &t2;
+            let t16 = t8 / &t2;
+            // Move x Move:
+            let _ = t9  + t10;
+            let _ = t11 - t12;
+            let _ = t13 * t14;
+            let _ = t15 / t16;
             t1.dot(&t2);
             t1.dot(t2);
         }
