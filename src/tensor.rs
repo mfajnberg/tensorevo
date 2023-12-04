@@ -259,8 +259,7 @@ mod tests {
 
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// Also tests that `Array2` fully implements `TensorOp`.
-    /// Only for the compiler, doesn't need to be executed as a test.
-    #[allow(dead_code)]
+    #[test]
     fn test_tensor_op() {
         fn some_generic_func<T: TensorOp>(mut t1: T, t2: T) {
             t1 += &t2;

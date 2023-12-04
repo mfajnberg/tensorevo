@@ -104,3 +104,40 @@ where N:
     + Sum
 {}
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exp() {
+        let exponent = 0.;
+        let result = Exp::exp(&exponent);
+        assert_eq!(result, 1.);
+        let exponent = 1.;
+        let result = Exp::exp(&exponent);
+        assert_eq!(result, 2.718281828459045);
+    }
+
+    #[test]
+    fn test_pow() {
+        let base = 8.;
+        let result = Pow::powi(&base, 2);
+        assert_eq!(result, 64.);
+        let result = Pow::powf(&base, 1./3.);
+        assert_eq!(result, 2.);
+        let base = 64.;
+        let result = Pow::sqrt(&base);
+        assert_eq!(result, 8.);
+    }
+
+    /// Tests that the built-in float types fully implement `TensorComponent`.
+    #[test]
+    fn test_tensor_component_impl() {
+        fn some_generic_func<C: TensorComponent>(_: C) {}
+        some_generic_func(0f32);
+        some_generic_func(1f64);
+        // Not implemented for integer types yet. The following would not pass the compiler:
+        // some_generic_func(0);
+    }
+}
