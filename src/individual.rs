@@ -7,7 +7,7 @@ use std::io::Error as IOError;
 use std::path::Path;
 
 use log::trace;
-use num_traits::{ToPrimitive, NumCast};
+use num_traits::FromPrimitive;
 use serde_json;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -168,7 +168,7 @@ impl<T: Tensor> Individual<T> {
         &mut self,
         batch_inputs: &T,
         batch_desired_outputs: &T,
-        update_factor: T::Element,
+        update_factor: T::Component,
         validation_data: Option<(&T, &T)>,
     ) {
         let num_layers = self.layers.len();
@@ -200,7 +200,7 @@ impl<T: Tensor> Individual<T> {
         validation_data: Option<(&T, &T)>,
     ) {
         let (_, batch_size) = training_data[0].0.shape();
-        let update_factor = <T::Element as NumCast>::from(learning_rate / batch_size.to_f32().unwrap()).unwrap();
+        let update_factor = T::Component::from_f32(learning_rate / batch_size as f32).unwrap();
         let num_batches = training_data.len();
         for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
             trace!("batch: {}/{}", i+1, num_batches);

@@ -3,7 +3,8 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::tensor::{TensorBase, TensorElement};
+use crate::component::TensorComponent;
+use crate::tensor::TensorBase;
 
 
 type TFunc<T> = fn(&T) -> T;
@@ -83,7 +84,7 @@ impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(sigmoid_element);
+    return tensor.map(sigmoid_component);
 }
 
 
@@ -91,13 +92,13 @@ pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
 ///
 /// Takes a tensor as input and mutates it in place.
 pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
-    tensor.map_inplace(sigmoid_element);
+    tensor.map_inplace(sigmoid_component);
 }
 
 
 /// Sigmoid function for a scalar/number.
-pub fn sigmoid_element<TE: TensorElement>(number: TE) -> TE {
-    let one = TE::from_usize(1).unwrap();
+pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
+    let one = C::from_usize(1).unwrap();
     return one / (one + (-number).exp());
 }
 
@@ -106,14 +107,14 @@ pub fn sigmoid_element<TE: TensorElement>(number: TE) -> TE {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(sigmoid_prime_element);
+    return tensor.map(sigmoid_prime_component);
 }
 
 
 /// Derivative of the sigmoid function for a scalar/number.
-pub fn sigmoid_prime_element<TE: TensorElement>(number: TE) -> TE {
-    let one = TE::from_usize(1).unwrap();
-    return sigmoid_element(number) * (one - sigmoid_element(number));
+pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
+    let one = C::from_usize(1).unwrap();
+    return sigmoid_component(number) * (one - sigmoid_component(number));
 }
 
 
@@ -121,13 +122,13 @@ pub fn sigmoid_prime_element<TE: TensorElement>(number: TE) -> TE {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn relu<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(relu_element);
+    return tensor.map(relu_component);
 }
 
 
 /// Rectified Linear Unit (RELU) activation function for a scalar/number.
-pub fn relu_element<TE: TensorElement>(number: TE) -> TE {
-    let zero = TE::from_usize(0).unwrap();
+pub fn relu_component<C: TensorComponent>(number: C) -> C {
+    let zero = C::from_usize(0).unwrap();
     if number < zero {
         return zero;
     }
@@ -139,14 +140,14 @@ pub fn relu_element<TE: TensorElement>(number: TE) -> TE {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(relu_prime_element);
+    return tensor.map(relu_prime_component);
 }
 
 
 /// Derivative of the Rectified Linear Unit (RELU) function for a scalar/number.
-pub fn relu_prime_element<TE: TensorElement>(number: TE) -> TE {
-    let zero = TE::from_usize(0).unwrap();
-    let one = TE::from_usize(1).unwrap();
+pub fn relu_prime_component<C: TensorComponent>(number: C) -> C {
+    let zero = C::from_usize(0).unwrap();
+    let one = C::from_usize(1).unwrap();
     return if number < zero { zero } else { one };
 }
 

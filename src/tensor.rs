@@ -1,44 +1,14 @@
-//! Definitions of the `Tensor` and `TensorElement` trait.
+//! Definition of the `Tensor` trait.
 
 use std::fmt::{Debug, Display};
-use std::iter::Sum;
 use std::ops;
 
 use ndarray::{Array2, Axis};
-use num_traits::{Float, FromPrimitive};
+use num_traits::FromPrimitive;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-
-/// Tensor Element
-// TODO: Consider seprating some of those supertraits.
-pub trait TensorElement:
-    // https://doc.rust-lang.org/rust-by-example/scope/lifetime/static_lifetime.html#trait-bound
-    'static
-    + Debug
-    + DeserializeOwned
-    + Display
-    // https://docs.rs/num-traits/latest/num_traits/float/trait.Float.html
-    + Float
-    // https://docs.rs/num-traits/latest/num_traits/cast/trait.FromPrimitive.html
-    + FromPrimitive
-    + Serialize
-    + Sum
-{}
-
-
-/// Generic implementation of the trait for any type that satisfies the `TensorElement` bounds:
-impl<N> TensorElement for N
-where N:
-    'static
-    + Debug
-    + DeserializeOwned
-    + Display
-    + Float
-    + FromPrimitive
-    + Serialize
-    + Sum
-{}
+use crate::component::TensorComponent;
 
 
 /// Types that support required linear algebra operations
@@ -53,35 +23,35 @@ pub trait TensorBase:
     // TODO: Add all relevant operator overloading traits from `std::ops`.
     //       https://github.com/mfajnberg/tensorevo/issues/5
 {
-    type Element: TensorElement;  // associated type must implement the `TensorElement` trait
+    type Component: TensorComponent;  // associated type must implement the `TensorComponent` trait
     
     /// Creates a `Tensor` with only zeros given a 2d shape
     fn zeros(shape: (usize, usize)) -> Self {
-        Self::from_num(Self::Element::from_usize(0).unwrap(), shape)
+        Self::from_num(Self::Component::from_usize(0).unwrap(), shape)
     }
     
     /// Creates a `Tensor` from a number
-    fn from_num(num: Self::Element, shape: (usize, usize)) -> Self;
+    fn from_num(num: Self::Component, shape: (usize, usize)) -> Self;
     
     /// Returns the 2d shape of self as a tuple
     fn shape(&self) -> (usize, usize);
     
-    /// Returns a vector of vectors of the tensor's elements
-    fn to_vec(&self) -> Vec<Vec<Self::Element>>;
+    /// Returns a vector of vectors of the tensor's components
+    fn to_vec(&self) -> Vec<Vec<Self::Component>>;
     
     /// Returns the transpose of itself as a new tensor
     fn transpose(&self) -> Self;
 
-    /// Maps a function to each element and returns the result as a new tensor
+    /// Calls a function for each component and returns the result as a new tensor
     fn map<F>(&self, f: F) -> Self
-    where F: FnMut(Self::Element) -> Self::Element;
+    where F: FnMut(Self::Component) -> Self::Component;
     
-    /// Maps a function to each element in place
+    /// Calls a function for each component in place
     fn map_inplace<F>(&mut self, f: F)
-    where F: FnMut(Self::Element) -> Self::Element;
+    where F: FnMut(Self::Component) -> Self::Component;
     
     /// Returns the norm of the tensor
-    fn vec_norm(&self) -> Self::Element;
+    fn vec_norm(&self) -> Self::Component;
 
     /// Returns the sum of all rows (0) or columns (1) as a new tensor
     fn sum_axis(&self, axis: usize) -> Self;
@@ -130,10 +100,10 @@ pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
 pub trait Tensor = TensorOp + TensorSerde;
 
 
-impl<TE: TensorElement> TensorBase for Array2<TE> {
-    type Element = TE;
+impl<C: TensorComponent> TensorBase for Array2<C> {
+    type Component = C;
 
-    fn from_num(num: Self::Element, shape: (usize, usize)) -> Self {
+    fn from_num(num: Self::Component, shape: (usize, usize)) -> Self {
         Self::from_elem(shape, num)
     }
     
@@ -141,8 +111,8 @@ impl<TE: TensorElement> TensorBase for Array2<TE> {
         self.dim()
     }
     
-    fn to_vec(&self) -> Vec<Vec<Self::Element>> {
-        let mut output = Vec::<Vec<Self::Element>>::new();
+    fn to_vec(&self) -> Vec<Vec<Self::Component>> {
+        let mut output = Vec::<Vec<Self::Component>>::new();
         for row in self.rows() {
             output.push(row.to_vec());
         }
@@ -154,19 +124,19 @@ impl<TE: TensorElement> TensorBase for Array2<TE> {
     }
 
     fn map<F>(&self, f: F) -> Self
-    where F: FnMut(TE) -> TE {
+    where F: FnMut(C) -> C {
         self.mapv(f)
     }
 
     fn map_inplace<F>(&mut self, f: F)
-    where F: FnMut(TE) -> TE {
+    where F: FnMut(C) -> C {
         self.mapv_inplace(f)
     }
 
     // TODO: Define separate `Norm` trait
     //       https://github.com/mfajnberg/tensorevo/issues/20
-    fn vec_norm(&self) -> Self::Element {
-        self.iter().map(|x| x.powi(2)).sum::<Self::Element>().sqrt()
+    fn vec_norm(&self) -> Self::Component {
+        self.iter().map(|x| x.powi(2)).sum::<Self::Component>().sqrt()
     }
 
     fn sum_axis(&self, axis: usize) -> Self {
@@ -175,7 +145,7 @@ impl<TE: TensorElement> TensorBase for Array2<TE> {
 }
 
 
-impl<TE: TensorElement> Dot for Array2<TE> {
+impl<C: TensorComponent> Dot for Array2<C> {
     type Output = Self;
 
     fn dot(&self, rhs: Self) -> Self::Output {
@@ -184,7 +154,7 @@ impl<TE: TensorElement> Dot for Array2<TE> {
 }
 
 
-impl<TE: TensorElement> Dot<&Array2<TE>> for Array2<TE> {
+impl<C: TensorComponent> Dot<&Array2<C>> for Array2<C> {
     type Output = Self;
 
     fn dot(&self, rhs: &Self) -> Self::Output {
@@ -241,8 +211,8 @@ mod tests {
 
         #[test]
         fn test_map() {
-            fn double<TE: TensorElement>(x: TE) -> TE {
-                return x * TE::from_usize(2).unwrap();
+            fn double<C: TensorComponent>(x: C) -> C {
+                return x * C::from_usize(2).unwrap();
             }
     
             let tensor = array![[0., 1.], [2., 3.]];
@@ -253,8 +223,8 @@ mod tests {
 
         #[test]
         fn test_map_inplace() {
-            fn halve<TE: TensorElement>(x: TE) -> TE {
-                return x / TE::from_usize(2).unwrap();
+            fn halve<C: TensorComponent>(x: C) -> C {
+                return x / C::from_usize(2).unwrap();
             }
     
             let mut tensor = array![[0., -2.], [4., -6.]];
