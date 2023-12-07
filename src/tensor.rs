@@ -64,7 +64,6 @@ pub trait Dot<Rhs = Self> {
     fn dot(&self, rhs: Rhs) -> Self::Output;
 }
 
-
 pub trait TensorOp =
 where 
     for<'a> Self:
@@ -77,9 +76,12 @@ where
         ops::DivAssign<&'a Self> +
         ops::Div<Output = Self> +
         ops::Div<&'a Self, Output = Self> +
+        ops::Index<[usize; 2], Output = <Self as TensorBase>::Component> +
+        ops::IndexMut<[usize; 2]> +
         ops::MulAssign<&'a Self> +
         ops::Mul<Output = Self> +
         ops::Mul<&'a Self, Output = Self> +
+        ops::Neg<Output = Self> +
         ops::SubAssign<&'a Self> +
         ops::Sub<Output = Self> +
         ops::Sub<&'a Self, Output = Self>,
@@ -90,6 +92,7 @@ where
         ops::Div<Self, Output = Self> +
         ops::Mul<Output = Self> +
         ops::Mul<Self, Output = Self> +
+        ops::Neg<Output = Self> +
         ops::Sub<Output = Self> +
         ops::Sub<Self, Output = Self>;
 
@@ -338,8 +341,12 @@ mod tests {
             let _ = t11 - t12;
             let _ = t13 * t14;
             let _ = t15 / t16;
+            let t3 = -&t1;
+            let _ = -t3;
             t1.dot(&t2);
             t1.dot(t2);
+            let x = t1[[0, 0]];
+            t1[[1, 0]] = x;
         }
         let tensor_a = array![
             [1., 2.],
