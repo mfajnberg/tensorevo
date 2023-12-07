@@ -95,11 +95,10 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// Two vectors of 2d-tensors of intermediate training data.
     fn get_weighted_inputs_and_activations(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
-        // TODO: Use `Vec::with_capacity`.
-        //       https://github.com/mfajnberg/tensorevo/issues/19
-        let mut weighted_inputs = Vec::<T>::new();
+        let num_layers = self.layers.len();
+        let mut weighted_inputs: Vec<T> = Vec::<T>::with_capacity(num_layers);
+        let mut activations = Vec::<T>::with_capacity(num_layers);
         let mut activation: T = batch_inputs.clone();
-        let mut activations = Vec::<T>::new();
         activations.push(activation.clone());
         for layer in (self.layers).iter() {
             let weighted_input: T;
@@ -122,36 +121,31 @@ impl<T: Tensor> Individual<T> {
     ///                             for each input sample/column in the `batch_inputs` tensor.
     /// 
     /// # Returns
-    /// The gradient of the cost function parameterized by the given inputs and desired outputs.
+    /// The gradient of the cost function parameterized by the given inputs and desired outputs in reverse order
+    /// (starting with the last layer).
     fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T,) -> (Vec<T>, Vec<T>) {
         let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
         let num_layers = self.layers.len();
-        // TODO: Use `Vec::with_capacity` and try to avoid the placeholder data.
-        //       https://github.com/mfajnberg/tensorevo/issues/19
-        let mut nabla_weights = Vec::<T>::new();
-        let mut nabla_biases = Vec::<T>::new();
-        for layer in &self.layers {
-            nabla_weights.push(T::zeros(layer.weights.shape()));
-            nabla_biases.push(T::zeros(layer.biases.shape()));
-        }
+        let mut nabla_weights = Vec::<T>::with_capacity(num_layers);
+        let mut nabla_biases = Vec::<T>::with_capacity(num_layers);
         // Go backwards
         let cost_derivative = self.cost_function.call_derivative(activations.last().unwrap(), batch_desired_outputs);
         let weighted_input = &weighted_inputs[num_layers - 1];
         let mut delta = cost_derivative * self.layers[num_layers - 1].activation.call_derivative(weighted_input);
-        nabla_weights[num_layers - 1] = delta.dot(activations[num_layers - 2].transpose());
-        nabla_biases[num_layers - 1] = delta.sum_axis(1);
+        nabla_weights.push(delta.dot(activations[num_layers - 2].transpose()));
+        nabla_biases.push(delta.sum_axis(1));
         for layer_num in (0..num_layers - 1).rev() {
             let weighted_input = &weighted_inputs[layer_num];
             let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
             delta = self.layers[layer_num + 1].weights.transpose().dot(delta) * sp;
             if layer_num > 0 {
-                nabla_weights[layer_num] = delta.dot(activations[layer_num - 1].transpose());
+                nabla_weights.push(delta.dot(activations[layer_num - 1].transpose()));
             } else { // activation of input layer == input
-                nabla_weights[layer_num] = delta.dot(batch_inputs.transpose());
+                nabla_weights.push(delta.dot(batch_inputs.transpose()));
             }
-            nabla_biases[layer_num] = delta.sum_axis(1);
+            nabla_biases.push(delta.sum_axis(1));
         }
-        return (nabla_biases, nabla_weights);
+        return (nabla_weights, nabla_biases);
     }
 
     /// Updates the weights and biases of the individual, 
@@ -171,13 +165,13 @@ impl<T: Tensor> Individual<T> {
         update_factor: T::Component,
         validation_data: Option<(&T, &T)>,
     ) {
-        let num_layers = self.layers.len();
-        let (nabla_biases, nabla_weights) = self.backprop(batch_inputs, batch_desired_outputs);
-        for idx in 0..num_layers {
+        let (nabla_weights, nabla_biases) = self.backprop(batch_inputs, batch_desired_outputs);
+        let gradients = nabla_weights.iter().zip(&nabla_biases).rev();
+        for (idx, (nw, nb)) in gradients.enumerate() {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
-            self.layers[idx].weights -= &(weights_update_factor * &nabla_weights[idx]);
+            self.layers[idx].weights -= &(weights_update_factor * nw);
             let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
-            self.layers[idx].biases -= &(biases_update_factor * &nabla_biases[idx]);
+            self.layers[idx].biases -= &(biases_update_factor * nb);
         }
         if let Some((input, desired_output)) = validation_data {
             trace!("validation error: {}", self.calculate_error(input, desired_output))
