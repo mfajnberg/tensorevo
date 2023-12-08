@@ -86,22 +86,23 @@ impl<T: Tensor> Individual<T> {
         return output;
     }
 
-    /// Passes an entire batch of inputs to the model to get certain intermediate training data for backprop.
+    /// Passes the `input` through the network and returns the intermediate results of each layer.
     ///
     /// # Arguments
-    /// * `batch_inputs` - 2D-tensor where each column is an input sample.
-    ///                    Therefore the number of rows must match the number of input neurons.
+    /// * `input` - 2D-tensor where each column is an input sample.
+    ///             Therefore the number of rows must match the number of input neurons.
     /// 
     /// # Returns
-    /// Two vectors of 2d-tensors of intermediate training data.
-    fn get_weighted_inputs_and_activations(&self, batch_inputs: &T) -> (Vec<T>, Vec<T>) {
+    /// Two vectors of tensors, the first being the weighted inputs to each layer and the second
+    /// being the activations of each layer.
+    fn forward_pass_memoized(&self, input: &T) -> (Vec<T>, Vec<T>) {
         let num_layers = self.layers.len();
         let mut weighted_inputs: Vec<T> = Vec::<T>::with_capacity(num_layers);
         let mut activations = Vec::<T>::with_capacity(num_layers);
-        let mut activation: T = batch_inputs.clone();
+        let mut activation: T = input.clone();
+        let mut weighted_input: T;
         activations.push(activation.clone());
-        for layer in (self.layers).iter() {
-            let weighted_input: T;
+        for layer in &self.layers {
             (weighted_input, activation) = layer.feed_forward(&activation);
             weighted_inputs.push(weighted_input);
             activations.push(activation.clone());
@@ -116,33 +117,45 @@ impl<T: Tensor> Individual<T> {
     /// by Michael Nielsen
     ///
     /// # Arguments
-    /// * `batch_inputs` - 2D-tensor where each column is an input sample.
-    /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
-    ///                             for each input sample/column in the `batch_inputs` tensor.
+    /// * `input` - 2D-tensor where each column is an input sample.
+    /// * `desired_output` - 2D-tensor where each column is the corresponding desired output
+    ///                      for each input sample/column in the `input` tensor.
     /// 
     /// # Returns
     /// The gradient of the cost function parameterized by the given inputs and desired outputs in reverse order
     /// (starting with the last layer).
-    fn backprop(&self, batch_inputs: &T, batch_desired_outputs: &T,) -> (Vec<T>, Vec<T>) {
-        let (weighted_inputs, activations) = self.get_weighted_inputs_and_activations(batch_inputs);
+    fn backprop(&self, input: &T, desired_output: &T) -> (Vec<T>, Vec<T>) {
+        let (weighted_inputs, activations) = self.forward_pass_memoized(input);
         let num_layers = self.layers.len();
+        // Initialize vectors to hold weights- and biases-gradients for all layers.
         let mut nabla_weights = Vec::<T>::with_capacity(num_layers);
         let mut nabla_biases = Vec::<T>::with_capacity(num_layers);
-        // Go backwards
-        let cost_derivative = self.cost_function.call_derivative(activations.last().unwrap(), batch_desired_outputs);
-        let weighted_input = &weighted_inputs[num_layers - 1];
-        let mut delta = cost_derivative * self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        // Weighted input to the activation function of the last layer:
+        let weighted_input = weighted_inputs.last().unwrap();
+        // Activation of the last layer, i.e. the network's output:
+        let output = activations.last().unwrap();
+        // Derivative of the last layer's activation function with respect to its weighted input:
+        let activation_derivative = self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        // Derivative of the cost function with respect to the last layer's activation:
+        let cost_derivative = self.cost_function.call_derivative(output, desired_output);
+        // Delta of the last layer:
+        let delta = cost_derivative * activation_derivative;
+        // Calculate and add the last layer's gradient components first.
         nabla_weights.push(delta.dot(activations[num_layers - 2].transpose()));
         nabla_biases.push(delta.sum_axis(1));
+        // Loop over the remaining layer indices in reverse order,
+        // i.e. starting with the second to last index (`num_layers - 2`) and ending with `0`.
         for layer_num in (0..num_layers - 1).rev() {
+            // Weighted input to the layer:
             let weighted_input = &weighted_inputs[layer_num];
-            let sp = self.layers[layer_num].activation.call_derivative(weighted_input);
-            delta = self.layers[layer_num + 1].weights.transpose().dot(delta) * sp;
-            if layer_num > 0 {
-                nabla_weights.push(delta.dot(activations[layer_num - 1].transpose()));
-            } else { // activation of input layer == input
-                nabla_weights.push(delta.dot(batch_inputs.transpose()));
-            }
+            // Activation of the previous layer:
+            let previous_activation = if layer_num > 0 { &activations[layer_num - 1] } else { input };
+            // Derivative of the layer's activation function with respect to its weighted input:
+            let activation_derivative = self.layers[layer_num].activation.call_derivative(weighted_input);
+            // Delta of the layer:
+            let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
+            // Calculate and add the layer's gradient components.
+            nabla_weights.push(delta.dot(previous_activation.transpose()));
             nabla_biases.push(delta.sum_axis(1));
         }
         return (nabla_weights, nabla_biases);
@@ -152,20 +165,20 @@ impl<T: Tensor> Individual<T> {
     /// given a single batch of inputs and corresponding desired outputs.
     ///
     /// # Arguments
-    /// * `batch_inputs` - 2D-tensor where each column is an input sample.
-    /// * `batch_desired_outputs` - 2D-tensor where each column is the corresponding desired output
-    ///                             for each input sample/column in the `batch_inputs` tensor.
+    /// * `input` - 2D-tensor where each column is an input sample.
+    /// * `desired_output` - 2D-tensor where each column is the corresponding desired output
+    ///                      for each input sample/column in the `input` tensor.
     /// * `update_factor` - The learning rate divided by the batch size.
     ///                     Adjusts the rate of change to the individual's weights and biases.
     /// * `validation_data` - An optional tuple of validation inputs and outputs used to update the model's error score.
     pub fn stochastic_gradient_descent_step(
         &mut self,
-        batch_inputs: &T,
-        batch_desired_outputs: &T,
+        input: &T,
+        desired_output: &T,
         update_factor: T::Component,
         validation_data: Option<(&T, &T)>,
     ) {
-        let (nabla_weights, nabla_biases) = self.backprop(batch_inputs, batch_desired_outputs);
+        let (nabla_weights, nabla_biases) = self.backprop(input, desired_output);
         let gradients = nabla_weights.iter().zip(&nabla_biases).rev();
         for (idx, (nw, nb)) in gradients.enumerate() {
             let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
