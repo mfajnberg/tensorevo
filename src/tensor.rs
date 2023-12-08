@@ -1,7 +1,7 @@
-//! Definition of the `Tensor` trait.
+//! Definition of the `TensorBase` and related traits, as well as some trait aliases combining them.
 
 use std::fmt::{Debug, Display};
-use std::ops;
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use ndarray::{Array2, Axis};
 use num_traits::FromPrimitive;
@@ -11,98 +11,119 @@ use serde::de::DeserializeOwned;
 use crate::component::TensorComponent;
 
 
-/// Types that support required linear algebra operations
-/// Can be created from vectors, json, or a number
-/// Can map functions
+/// Basic methods of multi-dimensional arrays ("tensors").
 pub trait TensorBase:
     Clone
     + Debug
     + Display
     + PartialEq
     + Sized
-    // TODO: Add all relevant operator overloading traits from `std::ops`.
-    //       https://github.com/mfajnberg/tensorevo/issues/5
 {
-    type Component: TensorComponent;  // associated type must implement the `TensorComponent` trait
+    /// The type of every component of the tensor.
+    type Component: TensorComponent;
     
-    /// Creates a `Tensor` with only zeros given a 2d shape
+    /// Creates a tensor of the specified `shape` with all zero components.
     fn zeros(shape: (usize, usize)) -> Self {
         Self::from_num(Self::Component::from_usize(0).unwrap(), shape)
     }
     
-    /// Creates a `Tensor` from a number
+    /// Creates a tensor of the specified `shape` with all components equal to `num`.
     fn from_num(num: Self::Component, shape: (usize, usize)) -> Self;
     
-    /// Returns the 2d shape of self as a tuple
+    /// Returns the shape of the tensor as a tuple of unsigned integers.
     fn shape(&self) -> (usize, usize);
     
-    /// Returns a vector of vectors of the tensor's components
+    /// Returns a vector of vectors of the tensor's components.
     fn to_vec(&self) -> Vec<Vec<Self::Component>>;
     
-    /// Returns the transpose of itself as a new tensor
+    /// Returns the transpose of itself as a new tensor.
     fn transpose(&self) -> Self;
 
-    /// Calls a function for each component and returns the result as a new tensor
+    /// Calls function `f` on each component and returns the result as a new tensor.
     fn map<F>(&self, f: F) -> Self
     where F: FnMut(Self::Component) -> Self::Component;
     
-    /// Calls a function for each component in place
+    /// Calls function `f` on each component mutating the tensor in place.
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
     
-    /// Returns the norm of the tensor
+    /// Returns the norm of the tensor.
     fn vec_norm(&self) -> Self::Component;
 
-    /// Returns the sum of all rows (0) or columns (1) as a new tensor
+    /// Returns the sum of all rows (0) or columns (1) as a new tensor.
     fn sum_axis(&self, axis: usize) -> Self;
 }
 
 
+/// Dot product aka. matrix multiplication.
 pub trait Dot<Rhs = Self> {
+    /// The output type of the multiplication operation.
     type Output;
 
+    /// Returns the dot product of `self` on the left and `rhs` on the right.
     fn dot(&self, rhs: Rhs) -> Self::Output;
 }
 
+
+/// `TensorBase` combined with basic mathematical operations and indexing.
 pub trait TensorOp =
 where 
     for<'a> Self:
         TensorBase +
+        // Componentwise addition (left-hand side moved):
+        Add<Output = Self> +
+        Add<&'a Self, Output = Self> +
+        // Componentwise addition-assignment:
+        AddAssign<&'a Self> +
+        // Componentwise division (left-hand side moved):
+        Div<Output = Self> +
+        Div<&'a Self, Output = Self> +
+        // Componentwise division-assignment:
+        DivAssign<&'a Self> +
+        // Dot product:
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
-        ops::AddAssign<&'a Self> +
-        ops::Add<Output = Self> +
-        ops::Add<&'a Self, Output = Self> +
-        ops::DivAssign<&'a Self> +
-        ops::Div<Output = Self> +
-        ops::Div<&'a Self, Output = Self> +
-        ops::Index<[usize; 2], Output = <Self as TensorBase>::Component> +
-        ops::IndexMut<[usize; 2]> +
-        ops::MulAssign<&'a Self> +
-        ops::Mul<Output = Self> +
-        ops::Mul<&'a Self, Output = Self> +
-        ops::Neg<Output = Self> +
-        ops::SubAssign<&'a Self> +
-        ops::Sub<Output = Self> +
-        ops::Sub<&'a Self, Output = Self>,
+        // Component access and assignment via subscript:
+        Index<[usize; 2], Output = <Self as TensorBase>::Component> +
+        IndexMut<[usize; 2]> +
+        // Componentwise multiplication (left-hand side moved):
+        Mul<Output = Self> +
+        Mul<&'a Self, Output = Self> +
+        // Componentwise multiplication-assignment:
+        MulAssign<&'a Self> +
+        // Negation (moving):
+        Neg<Output = Self> +
+        // Componentwise subtraction (left-hand side moved):
+        Sub<Output = Self> +
+        Sub<&'a Self, Output = Self> +
+        // Componentwise subtraction-assignment:
+        SubAssign<&'a Self>,
     for<'a> &'a Self:
-        ops::Add<Output = Self> +
-        ops::Add<Self, Output = Self> +
-        ops::Div<Output = Self> +
-        ops::Div<Self, Output = Self> +
-        ops::Mul<Output = Self> +
-        ops::Mul<Self, Output = Self> +
-        ops::Neg<Output = Self> +
-        ops::Sub<Output = Self> +
-        ops::Sub<Self, Output = Self>;
+        // Componentwise addition (left-hand side borrowed):
+        Add<Output = Self> +
+        Add<Self, Output = Self> +
+        // Componentwise division (left-hand side borrowed):
+        Div<Output = Self> +
+        Div<Self, Output = Self> +
+        // Componentwise multiplication (left-hand side borrowed):
+        Mul<Output = Self> +
+        Mul<Self, Output = Self> +
+        // Negation (borrowing):
+        Neg<Output = Self> +
+        // Componentwise subtraction (left-hand side borrowed):
+        Sub<Output = Self> +
+        Sub<Self, Output = Self>;
 
 
+/// `TensorBase` combined with `serde` (de-)serialization.
 pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
 
 
+/// `TensorOp` and `TensorSerde`.
 pub trait Tensor = TensorOp + TensorSerde;
 
 
+/// Implementation of `TensorBase` for `ndarray::Array2`.
 impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
 
@@ -148,6 +169,7 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
 }
 
 
+/// Implementation of `Dot` for `ndarray::Array2` (right-hand side moved).
 impl<C: TensorComponent> Dot for Array2<C> {
     type Output = Self;
 
@@ -157,6 +179,7 @@ impl<C: TensorComponent> Dot for Array2<C> {
 }
 
 
+/// Implementation of `Dot` for `ndarray::Array2` (right-hand side borrowed).
 impl<C: TensorComponent> Dot<&Array2<C>> for Array2<C> {
     type Output = Self;
 
@@ -172,7 +195,7 @@ mod tests {
 
     use super::*;
 
-    mod test_tensor_ndarray {
+    mod test_tensor_base_array2 {
         use super::*;
 
         #[test]
@@ -287,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dot_array() {
+    fn test_dot_array2() {
         let tensor_a = array![
             [0., 1., 2.],
             [3., 2., 1.]
@@ -312,42 +335,11 @@ mod tests {
         assert_eq!(result2, expected2);
     }
 
-    /// Tests that the `TensorOp` trait alias covers the expected traits.
-    /// Also tests that `Array2` fully implements `TensorOp`.
+    /// Tests that `Array2` fully implements `TensorOp`.
+    /// This test function does not need assertions because we just want to make sure that
+    /// the compiler allows `test_tensor_op_traits` to be called with `Array2` arguments.
     #[test]
-    fn test_tensor_op() {
-        fn some_generic_func<T: TensorOp>(mut t1: T, t2: T) {
-            t1 += &t2;
-            t1 /= &t2;
-            t1 *= &t2;
-            t1 -= &t2;
-            // Borrow x Borrow:
-            let t5 = &t1 + &t2;
-            let t6 = &t1 - &t2;
-            let t7 = &t1 * &t2;
-            let t8 = &t1 / &t2;
-            // Borrow x Move:
-            let t9  = &t1 + t5.clone();
-            let t10 = &t1 - t6.clone();
-            let t11 = &t1 * t7.clone();
-            let t12 = &t1 / t8.clone();
-            // Move x Borrow:
-            let t13 = t5 + &t2;
-            let t14 = t6 - &t2;
-            let t15 = t7 * &t2;
-            let t16 = t8 / &t2;
-            // Move x Move:
-            let _ = t9  + t10;
-            let _ = t11 - t12;
-            let _ = t13 * t14;
-            let _ = t15 / t16;
-            let t3 = -&t1;
-            let _ = -t3;
-            t1.dot(&t2);
-            t1.dot(t2);
-            let x = t1[[0, 0]];
-            t1[[1, 0]] = x;
-        }
+    fn test_tensor_op_array2() {
         let tensor_a = array![
             [1., 2.],
             [3., 4.]
@@ -356,7 +348,48 @@ mod tests {
             [ 0., -1.],
             [-2., -3.]
         ];
-        some_generic_func(tensor_a, tensor_b);
+        test_tensor_op_traits(tensor_a, tensor_b);
+    }
+
+    /// Tests that the `TensorOp` trait alias covers the expected traits.
+    /// This function does not need assertions and does not need to be run as a test
+    /// because it just needs to pass the compiler.
+    fn test_tensor_op_traits<T: TensorOp>(mut t1: T, t2: T) {
+        // Negation (borrowing & moving):
+        let t3 = -&t1;
+        let _ = -t3;
+        // Dot product (borrowing and moving right-hand side):
+        let t4 = t1.dot(&t2);
+        t1.dot(t4);
+        // Operation-assignment (borrowed right-hand side only):
+        t1 += &t2;
+        t1 /= &t2;
+        t1 *= &t2;
+        t1 -= &t2;
+        // Basic arithmetic operations:
+        // Borrow x Borrow:
+        let t5 = &t1 + &t2;
+        let t6 = &t1 - &t2;
+        let t7 = &t1 * &t2;
+        let t8 = &t1 / &t2;
+        // Borrow x Move:
+        let t9  = &t1 + t5.clone();
+        let t10 = &t1 - t6.clone();
+        let t11 = &t1 * t7.clone();
+        let t12 = &t1 / t8.clone();
+        // Move x Borrow:
+        let t13 = t5 + &t2;
+        let t14 = t6 - &t2;
+        let t15 = t7 * &t2;
+        let t16 = t8 / &t2;
+        // Move x Move:
+        let _ = t9  + t10;
+        let _ = t11 - t12;
+        let _ = t13 * t14;
+        let _ = t15 / t16;
+        // Index access to and re-assignment of components:
+        let x = t1[[0, 0]];
+        t1[[1, 0]] = x;
     }
 }    
 
