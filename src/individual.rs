@@ -75,13 +75,7 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// Output tensor from the last layer
     pub fn forward_pass(&self, input: &T) -> T {
-        let mut _weighted_input: T;
-        let mut output: T = input.clone();
-        // TODO: Consider replacing this loop with `Iterator::fold`.
-        for layer in (self.layers).iter() {
-            (_weighted_input, output) = layer.feed_forward(&output);
-        }
-        return output;
+        self.layers.iter().fold(input.clone(), |output, layer| layer.feed_forward(&output).1)
     }
 
     /// Passes the `input` through the network and returns the intermediate results of each layer.
@@ -99,8 +93,10 @@ impl<T: Tensor> Individual<T> {
         let mut activations = Vec::<T>::with_capacity(num_layers);
         let mut activation: T = input.clone();
         let mut weighted_input: T;
+        // TODO: See, if we actually need this first item in `backprop` (below).
+        //       Consider replacing this loop with `Iterator` methods.
+        //       https://github.com/mfajnberg/tensorevo/issues/21
         activations.push(activation.clone());
-        // TODO: Consider replacing this loop with `Iterator::map` and `collect`.
         for layer in &self.layers {
             (weighted_input, activation) = layer.feed_forward(&activation);
             weighted_inputs.push(weighted_input);
