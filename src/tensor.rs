@@ -164,11 +164,10 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     }
     
     fn to_vec(&self) -> Vec<Vec<Self::Component>> {
-        let mut output = Vec::<Vec<Self::Component>>::new();
-        for row in self.rows() {
-            output.push(row.to_vec());
-        }
-        return output;
+        self.rows()
+            .into_iter()
+            .map(|row| row.to_vec())
+            .collect()
     }
 
     fn transpose(&self) -> Self {
@@ -301,7 +300,7 @@ mod tests {
                 [0., 1., 2.],
                 [3., 4., 5.]
             ];
-            let vector = tensor.to_vec();
+            let vector = TensorBase::to_vec(&tensor);
             let expected = vec![
                 [0., 1., 2.],
                 [3., 4., 5.]
