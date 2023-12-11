@@ -1,7 +1,8 @@
-//! Definition of the `Individual` struct.
+//! Definition of the [`Individual`] struct.
 //!
 //! The `Individual` is the centerpiece of the evolutionary process.
 
+use std::fmt::Debug;
 use std::fs::read_to_string;
 use std::io::Error as IOError;
 use std::path::Path;
@@ -19,7 +20,8 @@ use crate::cost_function::CostFunction;
 
 /// Neural network with evolutionary methods.
 ///
-/// Derives the `Deserialize` and `Serialize` traits from `serde`, as well as `PartialEq` and `Debug`.
+/// Derives the [`Deserialize`] and [`Serialize`] traits from [`serde`],
+/// as well as [`PartialEq`] and [`Debug`].
 #[derive(Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Individual<T: Tensor> {
@@ -32,7 +34,7 @@ pub struct Individual<T: Tensor> {
 }
 
 
-/// Error that may occur when trying to load an `Individual` instance from a file.
+/// Error that may occur when trying to load an [`Individual`] instance from a file.
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub enum LoadError {
@@ -44,14 +46,12 @@ pub enum LoadError {
 impl<T: Tensor> Individual<T> {
     /// Constructs a new individual from a vector of layers.
     ///
-    /// Initial validation error is set to `None`.
-    ///
     /// # Arguments
-    /// * `layers` - vector of `Layer` structs ordered from input to output layer
+    /// * `layers` - vector of [`Layer`] structs ordered from input to output layer
     /// * `cost_function` - self explanatory
     ///
     /// # Returns
-    /// New `Individual` with the given layers
+    /// New [`Individual`] with the given layers
     pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
         Self { layers, cost_function }
     }
@@ -62,7 +62,7 @@ impl<T: Tensor> Individual<T> {
     /// * `path` - path to the json file
     /// 
     /// # Returns
-    /// A new `Individual` instance or a `LoadError`
+    /// A new [`Individual`] instance or a [`LoadError`]
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LoadError> {
         Ok(serde_json::from_str(read_to_string(path)?.as_str())?)
     }
@@ -70,7 +70,7 @@ impl<T: Tensor> Individual<T> {
     /// Performs a full forward pass for a given input and returns the network's output.
     ///
     /// # Arguments
-    /// * `input` - Tensor with a shape that matches the first/input layer
+    /// * `input` - [Tensor] with a shape that matches the first/input layer
     ///
     /// # Returns
     /// Output tensor from the last layer
@@ -193,7 +193,7 @@ impl<T: Tensor> Individual<T> {
     /// * `training_data` - Vector of tuples of two Tensors each, where the first one is a batch of inputs,
     ///                     and the second one is a corresponding batch of output data.
     /// * `validation_data` - An optional tuple of validation inputs and outputs passed onward to 
-    ///                       `stochastic_gradient_descent_step` where it's used to update `self.error_validation`
+    ///                       `stochastic_gradient_descent_step`
     /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     pub fn stochastic_gradient_descent(
         &mut self,

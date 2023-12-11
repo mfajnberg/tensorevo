@@ -1,4 +1,4 @@
-//! Definition of the `CostFunction` struct and the most common cost functions as well as their
+//! Definition of the [`CostFunction`] struct and the most common cost functions as well as their
 //! derivatives.
 
 use num_traits::ToPrimitive;
@@ -13,8 +13,10 @@ type TFuncPrime<T> = fn(&T, &T) -> T;
 
 /// Convenience struct to store a cost function together with its name and derivative.
 ///
-/// This is used in the `Individual` struct.
+/// This is used in the [`Individual`] struct.
 /// Facilitates (de-)serialization.
+///
+/// [`Individual`]: crate::individual::Individual
 #[derive(Debug, Eq, PartialEq)]
 pub struct CostFunction<T: TensorBase> {
     name: String,
@@ -33,7 +35,7 @@ impl<T: TensorBase> CostFunction<T> {
     /// Convenience constructor for known/available cost functions.
     ///
     /// Pre-defined functions are determined from hard-coded names:
-    /// - `quadratic`
+    /// - [`quadratic`]
     pub fn from_name<S, TO>(name: S) -> CostFunction<TO>
     where
         S:  Into<String>,
@@ -69,7 +71,7 @@ impl<T: TensorOp> Default for CostFunction<T> {
 }
 
 
-/// Allows `serde` to serialize `CostFunction` objects.
+/// Allows [`serde`] to serialize [`CostFunction`] objects.
 impl<T: TensorBase> Serialize for CostFunction<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.name)
@@ -77,7 +79,7 @@ impl<T: TensorBase> Serialize for CostFunction<T> {
 }
 
 
-/// Allows `serde` to deserialize to `CostFunction` objects.
+/// Allows [`serde`] to deserialize to [`CostFunction`] objects.
 impl<'de, T: TensorOp> Deserialize<'de> for CostFunction<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self::from_name(String::deserialize(deserializer)?))

@@ -1,4 +1,4 @@
-//! Definition of the `TensorBase` and related traits, as well as some trait aliases combining them.
+//! Definition of the [`TensorBase`] and related traits, as well as some trait aliases combining them.
 
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -91,7 +91,7 @@ pub trait Norm {
 }
 
 
-/// `TensorBase` combined with basic mathematical operations and indexing.
+/// [`TensorBase`] combined with basic mathematical operations and indexing.
 pub trait TensorOp =
 where 
     for<'a> Self:
@@ -143,15 +143,15 @@ where
         Sub<Self, Output = Self>;
 
 
-/// `TensorBase` combined with `serde` (de-)serialization.
+/// [`TensorBase`] combined with `serde` (de-)serialization.
 pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
 
 
-/// `TensorOp` and `TensorSerde`.
+/// [`TensorOp`] and [`TensorSerde`].
 pub trait Tensor = TensorOp + TensorSerde;
 
 
-/// Implementation of `TensorBase` for `ndarray::Array2`.
+/// Implementation of [`TensorBase`] for `ndarray::Array2`.
 impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
 

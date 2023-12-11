@@ -1,3 +1,5 @@
+//! Rust library for creating, training and evolving neural networks.
+
 #![feature(trait_alias)]
 
 pub mod activation;

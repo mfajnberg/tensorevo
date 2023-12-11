@@ -1,4 +1,4 @@
-//! Definition of the `Activation` struct and the most common activation functions as well as their
+//! Definition of the [`Activation`] struct and the most common activation functions as well as their
 //! derivatives.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -12,8 +12,10 @@ type TFunc<T> = fn(&T) -> T;
 
 /// Convenience struct to store an activation function together with its name and derivative.
 ///
-/// This is used in the `Layer` struct.
+/// This is used in the [`Layer`] struct.
 /// Facilitates (de-)serialization.
+///
+/// [`Layer`]: crate::layer::Layer
 #[derive(Debug, Eq, PartialEq)]
 pub struct Activation<T: TensorBase> {
     name: String,
@@ -32,8 +34,8 @@ impl<T: TensorBase> Activation<T> {
     /// Convenience constructor for known/available activation functions.
     ///
     /// Pre-defined functions are determined from hard-coded names:
-    /// - `sigmoid`
-    /// - `relu`
+    /// - [`sigmoid`]
+    /// - [`relu`]
     pub fn from_name<S: Into<String>>(name: S) -> Self {
         let name: String = name.into();
         let function: TFunc<T>;
@@ -60,7 +62,7 @@ impl<T: TensorBase> Activation<T> {
 }
 
 
-/// Allows `serde` to serialize `Activation` objects.
+/// Allows [`serde`] to serialize [`Activation`] objects.
 impl<T: TensorBase> Serialize for Activation<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.name)
@@ -68,7 +70,7 @@ impl<T: TensorBase> Serialize for Activation<T> {
 }
 
 
-/// Allows `serde` to deserialize to `Activation` objects.
+/// Allows [`serde`] to deserialize to [`Activation`] objects.
 impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self::from_name(String::deserialize(deserializer)?))

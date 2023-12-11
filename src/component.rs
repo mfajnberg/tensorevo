@@ -1,4 +1,4 @@
-//! Definition of the `TensorComponent` and related traits.
+//! Definition of the [`TensorComponent`] and related traits.
 
 use std::fmt::{Debug, Display};
 use std::iter::Sum;
@@ -132,7 +132,9 @@ impl Pow for isize {
 }
 
 
-/// Trait that must be implemented by any type in order to be usable as a `Tensor` component.
+/// Trait that must be implemented by any type in order to be usable as a [`Tensor`] component.
+///
+/// [`Tensor`]: crate::tensor::Tensor
 pub trait TensorComponent:
     // https://doc.rust-lang.org/rust-by-example/scope/lifetime/static_lifetime.html#trait-bound
     'static
@@ -152,10 +154,10 @@ pub trait TensorComponent:
 {}
 
 
-/// Generic implementation of the trait for any type that satisfies the `TensorComponent` bounds.
+/// Generic implementation of the trait for any type that satisfies the [`TensorComponent`] bounds.
 ///
-/// Since `Exp` and `Pow` are implemented for all `Float` types above, those are automatically covered
-/// and will implement `TensorComponent`.
+/// Since [`Exp`] and [`Pow`] are implemented for [`f32`], [`f64`] and [`isize`],
+/// those are automatically covered and will implement [`TensorComponent`].
 impl<N> TensorComponent for N
 where N:
     'static

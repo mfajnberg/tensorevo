@@ -1,3 +1,6 @@
+// TODO: Documentation
+//       https://github.com/mfajnberg/tensorevo/issues/22
+
 use serde::{Deserialize, Serialize};
 
 use crate::activation::Activation;
