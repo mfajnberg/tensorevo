@@ -101,7 +101,7 @@ pub fn quadratic<T: TensorOp>(
     output: &T,
     desired_output: &T,
 ) -> f32 {
-    return (desired_output - output).vec_norm().to_f32().unwrap() / 2.
+    (desired_output - output).norm().to_f32().unwrap() / 2.
 }
 
 
@@ -120,5 +120,5 @@ pub fn quadratic_prime<T: TensorOp>(
     output: &T,
     desired_output: &T,
 ) -> T {
-    return output - desired_output
+    output - desired_output
 }

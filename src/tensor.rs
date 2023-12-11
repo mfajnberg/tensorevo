@@ -5,6 +5,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, 
 
 use ndarray::{Array2, Axis};
 use num_traits::FromPrimitive;
+use num_traits::real::Real;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -47,9 +48,6 @@ pub trait TensorBase:
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
     
-    /// Returns the norm of the tensor.
-    fn vec_norm(&self) -> Self::Component;
-
     /// Returns the sum of all rows (0) or columns (1) as a new tensor.
     fn sum_axis(&self, axis: usize) -> Self;
 }
@@ -62,6 +60,34 @@ pub trait Dot<Rhs = Self> {
 
     /// Returns the dot product of `self` on the left and `rhs` on the right.
     fn dot(&self, rhs: Rhs) -> Self::Output;
+}
+
+
+/// Calculate norms of a tensor.
+pub trait Norm {
+    /// Output type of any norm method.
+    type Output: TensorComponent;
+
+    /// Returns the supremum norm.
+    fn norm_max(&self) -> Self::Output;
+
+    /// Returns the p-norm for any `p` >= 1.
+    fn norm_p(&self, p: impl Real) -> Self::Output;
+
+    /// Returns the l1-norm (manhattan norm).
+    fn norm_1(&self) -> Self::Output {
+        self.norm_p(1.)
+    }
+
+    /// Returns the l2-norm (euclidian norm).
+    fn norm_2(&self) -> Self::Output {
+        self.norm_p(2.)
+    }
+
+    /// Alias for `norm_2`.
+    fn norm(&self) -> Self::Output {
+        self.norm_2()
+    }
 }
 
 
@@ -93,6 +119,8 @@ where
         MulAssign<&'a Self> +
         // Negation (moving):
         Neg<Output = Self> +
+        // Norm:
+        Norm +
         // Componentwise subtraction (left-hand side moved):
         Sub<Output = Self> +
         Sub<&'a Self, Output = Self> +
@@ -157,12 +185,6 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
         self.mapv_inplace(f)
     }
 
-    // TODO: Define separate `Norm` trait
-    //       https://github.com/mfajnberg/tensorevo/issues/20
-    fn vec_norm(&self) -> Self::Component {
-        self.iter().map(|x| x.powi(2)).sum::<Self::Component>().sqrt()
-    }
-
     fn sum_axis(&self, axis: usize) -> Self {
         self.sum_axis(Axis(axis)).insert_axis(Axis(axis))
     }
@@ -185,6 +207,54 @@ impl<C: TensorComponent> Dot<&Array2<C>> for Array2<C> {
 
     fn dot(&self, rhs: &Self) -> Self::Output {
         self.dot(rhs)
+    }
+}
+
+
+/// Implementation of `Norm` for `ndarray::Array2`.
+impl<P: TensorComponent> Norm for Array2<P> {
+    type Output = P;
+
+    /// Returns the largest absolute value of all array components.
+    fn norm_max(&self) -> Self::Output {
+        self.iter().fold(
+            P::zero(),
+            |largest, component| {
+                let absolute = component.abs();
+                if largest > absolute {
+                    largest
+                } else {
+                    absolute
+                }
+            }
+        )
+    }
+
+    /// Converts `p` to `f32` before calculating the norm.
+    ///
+    /// Panics, if `p` is less than 1.
+    fn norm_p(&self, p: impl Real) -> Self::Output {
+        let pf32 = p.to_f32().unwrap();
+        if pf32 < 1. { panic!("P-norm undefined for p < 1") }
+        self.iter()
+            .map(|component| component.abs().powf(p))
+            .sum::<P>()
+            .powf(1./pf32)
+    }
+
+    /// Sums the absolute values of all array components.
+    fn norm_1(&self) -> Self::Output {
+        self.iter()
+            .map(|component| component.abs())
+            .sum()
+    }
+
+    /// Takes the square root of the squares of all array components.
+    fn norm_2(&self) -> Self::Output {
+        self.iter()
+            .map(|component| component.abs().powf(2.))
+            .sum::<P>()
+            .sqrt()
     }
 }
 
@@ -333,6 +403,25 @@ mod tests {
             [150., 120.]
         ];
         assert_eq!(result2, expected2);
+    }
+
+    #[test]
+    fn test_norm_array2() {
+        let tensor = array![
+            [ 0.,  1.,  2.],
+            [-3., -1.,  1.]
+        ];
+        let result = tensor.norm_max();
+        assert_eq!(result, 3.);
+
+        let result = tensor.norm_p(80.).round();
+        assert_eq!(result, 3.);
+
+        let result = tensor.norm_1();
+        assert_eq!(result, 8.);
+
+        let result = tensor.norm_2();
+        assert_eq!(result, 4.);
     }
 
     /// Tests that `Array2` fully implements `TensorOp`.
