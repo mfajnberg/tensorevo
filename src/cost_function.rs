@@ -26,15 +26,20 @@ pub struct CostFunction<T: TensorBase> {
 /// Methods for convenient construction and calling.
 impl<T: TensorBase> CostFunction<T> {
     /// Basic constructor to manually define all fields.
-    pub fn new(name: &str, function: TFunc<T>, derivative: TFuncPrime<T>) -> Self {
-        Self { name: name.to_owned(), function, derivative }
+    pub fn new<S: Into<String>>(name: S, function: TFunc<T>, derivative: TFuncPrime<T>) -> Self {
+        Self { name: name.into(), function, derivative }
     }
 
     /// Convenience constructor for known/available cost functions.
     ///
     /// Pre-defined functions are determined from hard-coded names:
     /// - `quadratic`
-    pub fn from_name<TO: TensorOp>(name: &str) -> CostFunction<TO> {
+    pub fn from_name<S, TO>(name: S) -> CostFunction<TO>
+    where
+        S:  Into<String>,
+        TO: TensorOp,
+    {
+        let name: String = name.into();
         let function: TFunc<TO>;
         let derivative: TFuncPrime<TO>;
         if name == "quadratic" {
@@ -42,11 +47,7 @@ impl<T: TensorBase> CostFunction<T> {
         } else {
             panic!();
         }
-        CostFunction {
-            name: name.to_owned(),
-            function,
-            derivative,
-        }
+        CostFunction { name, function, derivative }
     }
 
     /// Proxy for the actual cost function.
@@ -79,8 +80,7 @@ impl<T: TensorBase> Serialize for CostFunction<T> {
 /// Allows `serde` to deserialize to `CostFunction` objects.
 impl<'de, T: TensorOp> Deserialize<'de> for CostFunction<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let name = String::deserialize(deserializer)?;
-        Ok(Self::from_name(name.as_str()))
+        Ok(Self::from_name(String::deserialize(deserializer)?))
     }
 }
 

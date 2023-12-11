@@ -25,8 +25,8 @@ pub struct Activation<T: TensorBase> {
 /// Methods for convenient construction and calling.
 impl<T: TensorBase> Activation<T> {
     /// Basic constructor to manually define all fields.
-    pub fn new(name: &str, function: TFunc<T>, derivative: TFunc<T>) -> Self {
-        return Self{name: name.to_owned(), function, derivative}
+    pub fn new<S: Into<String>>(name: S, function: TFunc<T>, derivative: TFunc<T>) -> Self {
+        Self { name: name.into(), function, derivative }
     }
 
     /// Convenience constructor for known/available activation functions.
@@ -34,7 +34,8 @@ impl<T: TensorBase> Activation<T> {
     /// Pre-defined functions are determined from hard-coded names:
     /// - `sigmoid`
     /// - `relu`
-    pub fn from_name(name: &str) -> Self {
+    pub fn from_name<S: Into<String>>(name: S) -> Self {
+        let name: String = name.into();
         let function: TFunc<T>;
         let derivative: TFunc<T>;
         if name == "sigmoid" {
@@ -44,11 +45,7 @@ impl<T: TensorBase> Activation<T> {
         } else {
             panic!();
         }
-        Self {
-            name: name.to_owned(),
-            function,
-            derivative,
-        }
+        Self { name, function, derivative }
     }
 
     /// Proxy for the actual activation function.
@@ -74,8 +71,7 @@ impl<T: TensorBase> Serialize for Activation<T> {
 /// Allows `serde` to deserialize to `Activation` objects.
 impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let name = String::deserialize(deserializer)?;
-        Ok(Self::from_name(name.as_str()))
+        Ok(Self::from_name(String::deserialize(deserializer)?))
     }
 }
 
