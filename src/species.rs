@@ -9,7 +9,7 @@ pub struct Species<T: Tensor> {
 
 impl<T: Tensor> Species<T> {
     pub fn new() -> Self {
-        return Self {
+        Self {
             individuals: Vec::new()
         }
     }
@@ -22,6 +22,6 @@ impl<T: Tensor> Species<T> {
 
 impl<T: Tensor> Default for Species<T> {
     fn default() -> Self {
-        return Species::new();
+        Species::new()
     }
 }

@@ -14,13 +14,13 @@ pub struct Layer<T: Tensor> {
 
 impl<T: Tensor> Layer<T> {
     pub fn new(weights: T, biases: T, activation: Activation<T>) -> Self {
-        return Self{weights, biases, activation}
+        Self { weights, biases, activation }
     }
 
     pub fn feed_forward(&self, input: &T) -> (T, T) {
         let weighted_input = &self.weights.dot(input) + &self.biases;
         let activation = self.activation.call(&weighted_input);
-        return (weighted_input, activation);
+        (weighted_input, activation)
     }
 }
 

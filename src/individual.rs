@@ -53,10 +53,7 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// New `Individual` with the given layers
     pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
-        return Individual { 
-            layers, 
-            cost_function,
-        }
+        Self { layers, cost_function }
     }
 
     /// Load an individual from a json file
@@ -67,7 +64,7 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// A new `Individual` instance or a `LoadError`
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LoadError> {
-        return Ok(serde_json::from_str(read_to_string(path)?.as_str())?);
+        Ok(serde_json::from_str(read_to_string(path)?.as_str())?)
     }
 
     /// Performs a full forward pass for a given input and returns the network's output.
@@ -80,6 +77,7 @@ impl<T: Tensor> Individual<T> {
     pub fn forward_pass(&self, input: &T) -> T {
         let mut _weighted_input: T;
         let mut output: T = input.clone();
+        // TODO: Consider replacing this loop with `Iterator::fold`.
         for layer in (self.layers).iter() {
             (_weighted_input, output) = layer.feed_forward(&output);
         }
@@ -102,6 +100,7 @@ impl<T: Tensor> Individual<T> {
         let mut activation: T = input.clone();
         let mut weighted_input: T;
         activations.push(activation.clone());
+        // TODO: Consider replacing this loop with `Iterator::map` and `collect`.
         for layer in &self.layers {
             (weighted_input, activation) = layer.feed_forward(&activation);
             weighted_inputs.push(weighted_input);
@@ -158,7 +157,7 @@ impl<T: Tensor> Individual<T> {
             nabla_weights.push(delta.dot(previous_activation.transpose()));
             nabla_biases.push(delta.sum_axis(1));
         }
-        return (nabla_weights, nabla_biases);
+        (nabla_weights, nabla_biases)
     }
 
     /// Updates the weights and biases of the individual, 
@@ -225,7 +224,7 @@ impl<T: Tensor> Individual<T> {
     /// The error value
     pub fn calculate_error(&self, input: &T, desired_output: &T,) -> f32 {
         let output = self.forward_pass(input);
-        return self.cost_function.call(&output, desired_output);
+        self.cost_function.call(&output, desired_output)
     }
 }
 
@@ -273,6 +272,6 @@ mod tests {
         individual_file.write_all(individual_json.as_bytes())?;
         let individual_loaded = Individual::from_file(individual_file.path())?;
         assert_eq!(individual_expected, individual_loaded);
-        return Ok(());
+        Ok(())
     }
 } 

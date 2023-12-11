@@ -44,7 +44,7 @@ impl<T: TensorBase> Activation<T> {
         } else {
             panic!();
         }
-        return Self {
+        Self {
             name: name.to_owned(),
             function,
             derivative,
@@ -53,12 +53,12 @@ impl<T: TensorBase> Activation<T> {
 
     /// Proxy for the actual activation function.
     pub fn call(&self, tensor: &T) -> T {
-        return (self.function)(tensor);
+        (self.function)(tensor)
     }
 
     /// Proxy for the derivative of the activation function.
     pub fn call_derivative(&self, tensor: &T) -> T {
-        return (self.derivative)(tensor);
+        (self.derivative)(tensor)
     }
 }
 
@@ -66,7 +66,7 @@ impl<T: TensorBase> Activation<T> {
 /// Allows `serde` to serialize `Activation` objects.
 impl<T: TensorBase> Serialize for Activation<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        return serializer.serialize_str(&self.name);
+        serializer.serialize_str(&self.name)
     }
 }
 
@@ -75,7 +75,7 @@ impl<T: TensorBase> Serialize for Activation<T> {
 impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let name = String::deserialize(deserializer)?;
-        return Ok(Self::from_name(name.as_str()));
+        Ok(Self::from_name(name.as_str()))
     }
 }
 
@@ -84,7 +84,7 @@ impl<'de, T: TensorBase> Deserialize<'de> for Activation<T> {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(sigmoid_component);
+    tensor.map(sigmoid_component)
 }
 
 
@@ -99,7 +99,7 @@ pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
 /// Sigmoid function for a scalar/number.
 pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
     let one = C::from_usize(1).unwrap();
-    return one / (one + (-number).exp());
+    one / (one + (-number).exp())
 }
 
 
@@ -107,14 +107,14 @@ pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(sigmoid_prime_component);
+    tensor.map(sigmoid_prime_component)
 }
 
 
 /// Derivative of the sigmoid function for a scalar/number.
 pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
     let one = C::from_usize(1).unwrap();
-    return sigmoid_component(number) * (one - sigmoid_component(number));
+    sigmoid_component(number) * (one - sigmoid_component(number))
 }
 
 
@@ -122,17 +122,14 @@ pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn relu<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(relu_component);
+    tensor.map(relu_component)
 }
 
 
 /// Rectified Linear Unit (RELU) activation function for a scalar/number.
 pub fn relu_component<C: TensorComponent>(number: C) -> C {
     let zero = C::from_usize(0).unwrap();
-    if number < zero {
-        return zero;
-    }
-    return number;
+    if number < zero { zero } else { number }
 }
 
 
@@ -140,7 +137,7 @@ pub fn relu_component<C: TensorComponent>(number: C) -> C {
 ///
 /// Takes a tensor as input and returns a new tensor.
 pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
-    return tensor.map(relu_prime_component);
+    tensor.map(relu_prime_component)
 }
 
 
@@ -148,7 +145,7 @@ pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
 pub fn relu_prime_component<C: TensorComponent>(number: C) -> C {
     let zero = C::from_usize(0).unwrap();
     let one = C::from_usize(1).unwrap();
-    return if number < zero { zero } else { one };
+    if number < zero { zero } else { one }
 }
 
 #[cfg(test)]

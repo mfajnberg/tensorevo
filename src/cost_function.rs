@@ -27,7 +27,7 @@ pub struct CostFunction<T: TensorBase> {
 impl<T: TensorBase> CostFunction<T> {
     /// Basic constructor to manually define all fields.
     pub fn new(name: &str, function: TFunc<T>, derivative: TFuncPrime<T>) -> Self {
-        return Self{name: name.to_owned(), function, derivative}
+        Self { name: name.to_owned(), function, derivative }
     }
 
     /// Convenience constructor for known/available cost functions.
@@ -42,7 +42,7 @@ impl<T: TensorBase> CostFunction<T> {
         } else {
             panic!();
         }
-        return CostFunction {
+        CostFunction {
             name: name.to_owned(),
             function,
             derivative,
@@ -51,19 +51,19 @@ impl<T: TensorBase> CostFunction<T> {
 
     /// Proxy for the actual cost function.
     pub fn call(&self, output: &T, desired_output: &T) -> f32 {
-        return (self.function)(output, desired_output);
+        (self.function)(output, desired_output)
     }
 
     /// Proxy for the derivative of the cost function.
     pub fn call_derivative(&self, output: &T, desired_output: &T) -> T {
-        return (self.derivative)(output, desired_output);
+        (self.derivative)(output, desired_output)
     }
 }
 
 
 impl<T: TensorOp> Default for CostFunction<T> {
     fn default() -> Self {
-        return Self::from_name("quadratic");
+        Self::from_name("quadratic")
     }
 }
 
@@ -71,7 +71,7 @@ impl<T: TensorOp> Default for CostFunction<T> {
 /// Allows `serde` to serialize `CostFunction` objects.
 impl<T: TensorBase> Serialize for CostFunction<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        return serializer.serialize_str(&self.name);
+        serializer.serialize_str(&self.name)
     }
 }
 
@@ -80,7 +80,7 @@ impl<T: TensorBase> Serialize for CostFunction<T> {
 impl<'de, T: TensorOp> Deserialize<'de> for CostFunction<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let name = String::deserialize(deserializer)?;
-        return Ok(Self::from_name(name.as_str()));
+        Ok(Self::from_name(name.as_str()))
     }
 }
 
@@ -97,10 +97,7 @@ impl<'de, T: TensorOp> Deserialize<'de> for CostFunction<T> {
 ///
 /// # Returns
 /// The cost as 32 bit float.
-pub fn quadratic<T: TensorOp>(
-    output: &T,
-    desired_output: &T,
-) -> f32 {
+pub fn quadratic<T: TensorOp>(output: &T, desired_output: &T) -> f32 {
     (desired_output - output).norm().to_f32().unwrap() / 2.
 }
 
@@ -116,9 +113,6 @@ pub fn quadratic<T: TensorOp>(
 ///
 /// # Returns
 /// Another tensor.
-pub fn quadratic_prime<T: TensorOp>(
-    output: &T,
-    desired_output: &T,
-) -> T {
+pub fn quadratic_prime<T: TensorOp>(output: &T, desired_output: &T) -> T {
     output - desired_output
 }

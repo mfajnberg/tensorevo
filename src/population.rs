@@ -24,12 +24,12 @@ impl<T: Tensor> Population<T> {
         procreation_function: ProcreateFunc<T>,
         determine_key_function: DetermineSpeciesKey<T>,
     ) -> Self {
-        return Population {
+        Self {
             species: HashMap::new(),
             kill_weak_and_select_parents: selection_function,
             procreate_pair: procreation_function,
             determine_species_key: determine_key_function,
-        };
+        }
     }
     
     // mutates sets of individuals within one species
