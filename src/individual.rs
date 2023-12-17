@@ -218,7 +218,7 @@ impl<T: Tensor> Individual<T> {
     /// 
     /// # Returns
     /// The error value
-    pub fn calculate_error(&self, input: &T, desired_output: &T,) -> f32 {
+    pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
         self.cost_function.call(&self.forward_pass(input), desired_output)
     }
 }

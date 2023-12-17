@@ -11,6 +11,7 @@ env_logger = "*"
 ndarray = { version = "0.15.6", features = ["serde"] }
 num-traits = "*"
 log = "*"
+ordered-float = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 tempfile = "*"
