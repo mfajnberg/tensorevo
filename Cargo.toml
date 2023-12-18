@@ -15,6 +15,7 @@ serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 tempfile = "*"
 thiserror = "*"
+uuid = { version = "*", features = ["v4", "fast-rng"] }
 
 [lints.clippy]
 needless_return = "allow"

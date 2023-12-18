@@ -12,6 +12,7 @@ use num_traits::FromPrimitive;
 use serde_json;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::layer::Layer;
 use crate::tensor::Tensor;
@@ -25,6 +26,9 @@ use crate::cost_function::CostFunction;
 #[derive(Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Individual<T: Tensor> {
+    /// Unique identifier.
+    id: u128,
+
     /// Layers of the neural network ordered from input to output layer.
     layers: Vec<Layer<T>>,
 
@@ -53,7 +57,15 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// New [`Individual`] with the given layers
     pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
-        Self { layers, cost_function }
+        Self {
+            id: Uuid::new_v4().as_u128(),
+            layers,
+            cost_function,
+        }
+    }
+
+    pub fn id(&self) -> u128 {
+        self.id
     }
 
     /// Load an individual from a json file
@@ -236,19 +248,23 @@ mod tests {
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
-        let individual_json = r#"{"layers": [
-            {
-                "weights":    {"v": 1, "dim": [2,2], "data": [0.0,1.0,2.0,3.0]},
-                "biases":     {"v": 1, "dim": [2,1], "data": [4.0,5.0]},
-                "activation": "sigmoid"
-            },
-            {
-                "weights":    {"v": 1, "dim": [2,2], "data": [0.0,-1.0,-2.0,-3.0]},
-                "biases":     {"v": 1, "dim": [2,1], "data": [-4.0,-5.0]},
-                "activation": "relu"
-            }
-        ]}"#;
+        let individual_json = r#"{
+            "id": 0,
+            "layers": [
+                {
+                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,1.0,2.0,3.0]},
+                    "biases":     {"v": 1, "dim": [2,1], "data": [4.0,5.0]},
+                    "activation": "sigmoid"
+                },
+                {
+                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,-1.0,-2.0,-3.0]},
+                    "biases":     {"v": 1, "dim": [2,1], "data": [-4.0,-5.0]},
+                    "activation": "relu"
+                }
+            ]
+        }"#;
         let individual_expected = Individual{
+            id: 0,
             layers: vec![
                 Layer::new(
                     array![[0., 1.], [2., 3.]],
