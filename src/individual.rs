@@ -29,7 +29,9 @@ pub struct Individual<T: Tensor> {
     /// Unique identifier.
     id: u128,
 
-    /// Layers of the neural network ordered from input to output layer.
+    /// Layers of the neural network ordered from first hidden layer to output layer.
+    /// (The number of neurons in the "input layer" is implied by the number of _columns_
+    /// in the weight matrix of the first hidden layer.)
     layers: Vec<Layer<T>>,
 
     /// Cost function used to calculate the error.
@@ -51,7 +53,7 @@ impl<T: Tensor> Individual<T> {
     /// Constructs a new individual from a vector of layers.
     ///
     /// # Arguments
-    /// * `layers` - vector of [`Layer`] structs ordered from input to output layer
+    /// * `layers` - vector of [`Layer`] structs ordered from first hidden layer to output layer
     /// * `cost_function` - self explanatory
     ///
     /// # Returns
