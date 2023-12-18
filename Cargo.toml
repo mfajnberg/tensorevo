@@ -8,10 +8,11 @@ crate-type = ["lib"]
 
 [dependencies]
 env_logger = "*"
+log = "*"
 ndarray = { version = "0.15.6", features = ["serde"] }
 num-traits = "*"
-log = "*"
 ordered-float = "*"
+rand = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 tempfile = "*"
