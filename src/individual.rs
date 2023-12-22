@@ -22,7 +22,7 @@ use crate::cost_function::CostFunction;
 ///
 /// Derives the [`Deserialize`] and [`Serialize`] traits from [`serde`],
 /// as well as [`PartialEq`] and [`Debug`].
-#[derive(Deserialize, Serialize, PartialEq, Debug)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Individual<T: Tensor> {
     /// Layers of the neural network ordered from input to output layer.
@@ -65,6 +65,10 @@ impl<T: Tensor> Individual<T> {
     /// A new [`Individual`] instance or a [`LoadError`]
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LoadError> {
         Ok(serde_json::from_str(read_to_string(path)?.as_str())?)
+    }
+
+    pub fn num_layers(&self) -> usize {
+        self.layers.len()
     }
 
     /// Performs a full forward pass for a given input and returns the network's output.

@@ -16,7 +16,7 @@ type TFunc<T> = fn(&T) -> T;
 /// Facilitates (de-)serialization.
 ///
 /// [`Layer`]: crate::layer::Layer
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Activation<T: TensorBase> {
     name: String,
     function: TFunc<T>,
