@@ -78,7 +78,7 @@ impl<T: Tensor> Population<T> {
 ///
 /// # Returns:
 /// Vector of 2-tuples of indices of the individuals in the specified species that should procreate.
-pub fn selection_function<T: Tensor>(population: &mut Population<T>, species_key: &str) -> Vec<(usize, usize)> {
+pub fn select<T: Tensor>(population: &mut Population<T>, species_key: &str) -> Vec<(usize, usize)> {
     // Sort individuals in species by validation error.
     let individuals = population.species.get_mut(species_key).unwrap();
     let (input, desired_output) = &population.validation_data;
@@ -102,6 +102,16 @@ pub fn selection_function<T: Tensor>(population: &mut Population<T>, species_key
 }
 
 
+pub fn procreate<T: Tensor>(parent1: &Individual<T>, parent2: &Individual<T>) -> Individual<T> {
+    parent1.clone()
+}
+
+
+pub fn get_species<T: Tensor>(individual: &Individual<T>) -> String {
+    individual.num_layers().to_string()
+}
+
+
 #[cfg(test)]
 mod tests {
     use ndarray::array;
@@ -110,10 +120,10 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut pop = Population::new(
-            selection_function,
-            "not a function",
-            "not a function",
+        let _pop = Population::new(
+            select,
+            procreate,
+            get_species,
             (array![[0.]], array![[0.]]),
         );
     }
