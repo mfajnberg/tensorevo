@@ -37,7 +37,7 @@ impl<T: Tensor> Population<T> {
             kill_weak_and_select_parents,
             procreate_pair,
             determine_species_key,
-            validation_data
+            validation_data,
         }
     }
     
@@ -45,18 +45,20 @@ impl<T: Tensor> Population<T> {
     pub fn apply_selection(&mut self, species_key: String) {
         let pairs = (self.kill_weak_and_select_parents)(self, &species_key);
         let species = self.species.get(&species_key).unwrap();
-        let new_individuals: Vec<Individual<T>> = pairs.iter().map(
-            |(index1, index2)| (self.procreate_pair)(&species[*index1], &species[*index2])
+        let new_individuals: Vec<Individual<T>> = pairs.into_iter().map(
+            |(index1, index2)| (self.procreate_pair)(&species[index1], &species[index2])
         ).collect();
-
         for new_individual in new_individuals {
-            let key = (self.determine_species_key)(&new_individual);
-            match self.species.get_mut(&key) {
-                Some(existing_species) => existing_species.push(new_individual),
-                _ => {
-                    let new_species = vec![new_individual];
-                    self.species.insert(key, new_species);
-                }
+            self.add_new_individual(new_individual)
+        }
+    }
+
+    pub fn add_new_individual(&mut self, individual: Individual<T>) {
+        let key = (self.determine_species_key)(&individual);
+        match self.species.get_mut(&key) {
+            Some(existing_species) => existing_species.push(individual),
+            None => {
+                self.species.insert(key, vec![individual]);
             }
         }
     }
