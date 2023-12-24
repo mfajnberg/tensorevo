@@ -7,7 +7,7 @@ use crate::activation::Activation;
 use crate::tensor::Tensor;
 
 
-#[derive(Deserialize, Serialize, PartialEq, Debug)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Layer<T: Tensor> {
     pub weights: T,

@@ -17,7 +17,7 @@ type TFuncPrime<T> = fn(&T, &T) -> T;
 /// Facilitates (de-)serialization.
 ///
 /// [`Individual`]: crate::individual::Individual
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CostFunction<T: TensorBase> {
     name: String,
     function: TFunc<T>,
