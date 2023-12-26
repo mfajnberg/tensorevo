@@ -143,8 +143,8 @@ where
         Sub<Self, Output = Self>;
 
 
-/// [`TensorBase`] combined with `serde` (de-)serialization.
-pub trait TensorSerde = TensorBase + DeserializeOwned + Serialize;
+/// Owned [`TensorBase`] combined with `serde` (de-)serialization.
+pub trait TensorSerde = 'static + TensorBase + DeserializeOwned + Serialize;
 
 
 /// [`TensorOp`] and [`TensorSerde`].
