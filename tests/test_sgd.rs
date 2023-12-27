@@ -18,7 +18,7 @@ fn test_sgd() {
                     [0.],
                     [0.],
                 ],
-                activation: Activation::from_name("relu"),
+                activation: Activation::from_name("relu").unwrap(),
             },
             Layer{
                 weights: array![
@@ -29,7 +29,7 @@ fn test_sgd() {
                     [0.],
                     [0.],
                 ],
-                activation: Activation::from_name("relu"),
+                activation: Activation::from_name("relu").unwrap(),
             },
         ],
         CostFunction::<Array2<f64>>::from_name("quadratic"),

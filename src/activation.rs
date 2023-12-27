@@ -68,10 +68,13 @@ impl<T: TensorBase + 'static> Activation<T> {
         get_or_init!(|| RwLock::new(ActivationRegistry::<T>::new()))
     }
 
-    /// Creates and registers a new [`Activation`].
+    /// Creates and registers a new [`Activation`] with the specified parameters.
     ///
-    /// A clone of the newly created [`Activation`] is added to the activation registry.
+    /// The newly created `Activation` instance is added to the activation registry.
     /// Subsequent calls to [`Activation::from_name`] passing the same name will return a clone of it.
+    ///
+    /// If an `Activation` was already registered under the specified `name`, it will be
+    /// replaced by the newly created one.
     ///
     /// # Arguments:
     /// - `name` - Key under which to register the new activation;
@@ -80,20 +83,18 @@ impl<T: TensorBase + 'static> Activation<T> {
     /// - `derivative` - Passed on to the [`Activation::new`] constructor.
     ///
     /// # Returns
-    /// Clone of the newly created [`Activation`] with the specified parameters.
-    pub fn register<S: Into<String>>(name: S, function: TFunc<T>, derivative: TFunc<T>) -> Self {
+    /// [`None`] if an activation with that name had not been registered before.
+    /// Otherwise the new `Activation` instance with the specified parameters is inserted and the old one is returned.
+    pub fn register<S: Into<String>>(name: S, function: TFunc<T>, derivative: TFunc<T>) -> Option<Self> {
         let name: String = name.into();
         let registry_lock = Self::get_activation_registry();
-        if registry_lock.read().unwrap().contains_key(&name) {
-            // TODO: Instead of panicking, make this function return a `Result`.
-            panic!("Activation already registered: {}", name);
-        }
-        let new_activation = Activation::<T>::new(name.clone(), function, derivative);
-        registry_lock.write().unwrap().insert(name, new_activation.clone());
-        new_activation
+        registry_lock.write().unwrap().insert(
+            name.clone(),
+            Activation::new(name, function, derivative),
+        )
     }
 
-    /// Returns a clone of a previously registered [`Activation`] by name.
+    /// Retrieves a clone of a previously registered [`Activation`] by name.
     ///
     /// Unless custom instances were added before via [`Activation::register`], reference implementations
     /// for the following activation functions will be available by default:
@@ -104,20 +105,16 @@ impl<T: TensorBase + 'static> Activation<T> {
     /// - `name` - The name/key of the activation to return.
     ///
     /// # Returns
-    /// Clone of the [`Activation`] instance with the specified `name`.
-    pub fn from_name<S: Into<String>>(name: S) -> Self {
-        let name: String = name.into();
+    /// Clone of the [`Activation`] instance with the specified `name` or [`None`] if none was
+    /// registered under that name.
+    pub fn from_name<S: Into<String>>(name: S) -> Option<Self> {
         let registry_lock = Self::get_activation_registry();
         // The registry should only be empty the first time this method is called.
         // In that case, fill it with the known/common activation functions.
         if registry_lock.read().unwrap().is_empty() {
-            Self::register_common(registry_lock)
+            Self::register_common(registry_lock);
         }
-        if !registry_lock.read().unwrap().contains_key(&name) {
-            // TODO: Instead of panicking, make this function return a `Result`.
-            panic!("No such key registered: {}", name)
-        }
-        registry_lock.read().unwrap().get(&name).unwrap().clone()
+        registry_lock.read().unwrap().get(&name.into()).and_then(|activation| Some(activation.clone()))
     }
 
     /// Registers reference implementations of some common activation functions.
@@ -128,7 +125,7 @@ impl<T: TensorBase + 'static> Activation<T> {
     ///
     /// # Arguments
     /// - `registry_lock` - Reference to the activation registry wrapped in a [`RwLock`]
-    fn register_common(registry_lock: &RwLock<ActivationRegistry<T>>) {
+    pub fn register_common(registry_lock: &RwLock<ActivationRegistry<T>>) {
         // TODO: Consider using `HashMap::try_insert` instead to avoid overwriting any custom
         //       implementations of common activation functions.
         registry_lock.write().unwrap().insert(
@@ -154,7 +151,7 @@ impl<T: TensorBase> Serialize for Activation<T> {
 /// Allows [`serde`] to deserialize to [`Activation`] objects.
 impl<'de, T: TensorBase + 'static> Deserialize<'de> for Activation<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Ok(Activation::from_name(String::deserialize(deserializer)?))
+        Ok(Activation::from_name(String::deserialize(deserializer)?).unwrap())
     }
 }
 
@@ -240,18 +237,27 @@ mod tests {
         fn test_register_and_from_name() {
             use ndarray::Array2;
 
+            type NDActivation = Activation<Array2<f64>>;
+
             let name = "foo".to_owned();
-            let function = relu;
-            let derivative = relu_prime;
 
-            // Register:
-            let activation = Activation::<Array2<f64>>::register(name.clone(), function, derivative);
-            let expected_activation = Activation { name, function, derivative };
-            assert_eq!(activation, expected_activation);
+            // Register under that name for the first time.
+            let option = NDActivation::register(name.clone(), relu, relu_prime);
+            assert_eq!(option, None);
 
-            // Get from registry by name:
-            let activation = Activation::from_name("foo");
-            assert_eq!(activation, expected_activation);
+            // Get from registry by name.
+            let option = NDActivation::from_name("foo");
+            let activation_relu = Activation { name: name.clone(), function: relu, derivative: relu_prime };
+            assert_eq!(option, Some(activation_relu));
+
+            // Register different one under the same name. Should return the previous one.
+            let option = NDActivation::register(name.clone(), sigmoid, sigmoid_prime);
+            let activation_sigmoid = Activation { name: name.clone(), function: sigmoid, derivative: sigmoid_prime };
+            assert_eq!(option, Some(activation_relu));
+
+            // Get the new one from the registry by name.
+            let option = NDActivation::from_name("foo");
+            assert_eq!(option, Some(activation_sigmoid));
         }
 
         #[test]
