@@ -35,23 +35,5 @@ mod tests {
 
     #[test]
     fn test() {
-        let input = array![
-            [1.],
-            [1.],
-        ];
-        let layer = Layer{
-            weights: array![
-                [1., 0.],
-                [0., 1.],
-            ],
-            biases: array![
-                [-1.],
-                [-1.],
-            ],
-            activation: Activation::from_name("sigmoid"),
-        };
-        let (z, a) = layer.feed_forward(&input);
-        println!("{}", z);
-        println!("{}", a);
     }    
 }
