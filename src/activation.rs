@@ -1,5 +1,4 @@
-//! Definition of the [`Activation`] struct and the most common activation functions as well as their
-//! derivatives.
+//! Definition of the [`Activation`] struct and the most common activation functions.
 
 use std::sync::RwLock;
 
@@ -10,6 +9,7 @@ use crate::tensor::TensorBase;
 use crate::utils::registry::Registry;
 
 pub use crate::utils::registered::Registered;
+pub use self::functions::*;
 
 
 type TFunc<T> = fn(&T) -> T;
@@ -66,9 +66,10 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 
 /// Provides a static registry of [`Activation<T>`] instances.
 ///
-/// Reference implementations for the following functions (and their derivatives) are available by default:
-/// - `sigmoid`
-/// - `relu`
+/// Reference implementations for some common functions (and their derivatives) are available by
+/// default under the following keys:
+/// - `sigmoid` (see [`sigmoid`] and [`sigmoid_prime`])
+/// - `relu` (see [`relu`] and [`relu_prime`])
 ///
 /// Custom instances registered via [`Registered::register`] under those names will replace the
 /// corresponding default implementations.
@@ -101,73 +102,79 @@ impl<T: 'static + TensorBase> Registered<String> for Activation<T> {
 }
 
 
-/// Reference implementation of the sigmoid activation function.
-///
-/// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
-    tensor.map(sigmoid_component)
+/// Reference implementations of some common activation functions as well as their derivatives.
+pub mod functions {
+    use super::*;
+
+    /// Reference implementation of the sigmoid activation function.
+    ///
+    /// Takes a tensor as input and returns a new tensor.
+    pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
+        tensor.map(sigmoid_component)
+    }
+    
+    
+    /// Reference implementation of the sigmoid activation function.
+    ///
+    /// Takes a tensor as input and mutates it in place.
+    pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
+        tensor.map_inplace(sigmoid_component);
+    }
+    
+    
+    /// Sigmoid function for a scalar/number.
+    pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
+        let one = C::from_usize(1).unwrap();
+        one / (one + (-number).exp())
+    }
+    
+    
+    /// Reference implementation of the derivative of the sigmoid activation function.
+    ///
+    /// Takes a tensor as input and returns a new tensor.
+    pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
+        tensor.map(sigmoid_prime_component)
+    }
+    
+    
+    /// Derivative of the sigmoid function for a scalar/number.
+    pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
+        let one = C::from_usize(1).unwrap();
+        sigmoid_component(number) * (one - sigmoid_component(number))
+    }
+    
+    
+    /// Reference implementation of the Rectified Linear Unit (RELU) activation function.
+    ///
+    /// Takes a tensor as input and returns a new tensor.
+    pub fn relu<T: TensorBase>(tensor: &T) -> T {
+        tensor.map(relu_component)
+    }
+    
+    
+    /// Rectified Linear Unit (RELU) activation function for a scalar/number.
+    pub fn relu_component<C: TensorComponent>(number: C) -> C {
+        let zero = C::from_usize(0).unwrap();
+        if number < zero { zero } else { number }
+    }
+    
+    
+    /// Reference implementation of the derivative of the Rectified Linear Unit (RELU) activation function.
+    ///
+    /// Takes a tensor as input and returns a new tensor.
+    pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
+        tensor.map(relu_prime_component)
+    }
+    
+    
+    /// Derivative of the Rectified Linear Unit (RELU) function for a scalar/number.
+    pub fn relu_prime_component<C: TensorComponent>(number: C) -> C {
+        let zero = C::from_usize(0).unwrap();
+        let one = C::from_usize(1).unwrap();
+        if number < zero { zero } else { one }
+    }
 }
 
-
-/// Reference implementation of the sigmoid activation function.
-///
-/// Takes a tensor as input and mutates it in place.
-pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
-    tensor.map_inplace(sigmoid_component);
-}
-
-
-/// Sigmoid function for a scalar/number.
-pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
-    let one = C::from_usize(1).unwrap();
-    one / (one + (-number).exp())
-}
-
-
-/// Reference implementation of the derivative of the sigmoid activation function.
-///
-/// Takes a tensor as input and returns a new tensor.
-pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
-    tensor.map(sigmoid_prime_component)
-}
-
-
-/// Derivative of the sigmoid function for a scalar/number.
-pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
-    let one = C::from_usize(1).unwrap();
-    sigmoid_component(number) * (one - sigmoid_component(number))
-}
-
-
-/// Reference implementation of the Rectified Linear Unit (RELU) activation function.
-///
-/// Takes a tensor as input and returns a new tensor.
-pub fn relu<T: TensorBase>(tensor: &T) -> T {
-    tensor.map(relu_component)
-}
-
-
-/// Rectified Linear Unit (RELU) activation function for a scalar/number.
-pub fn relu_component<C: TensorComponent>(number: C) -> C {
-    let zero = C::from_usize(0).unwrap();
-    if number < zero { zero } else { number }
-}
-
-
-/// Reference implementation of the derivative of the Rectified Linear Unit (RELU) activation function.
-///
-/// Takes a tensor as input and returns a new tensor.
-pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
-    tensor.map(relu_prime_component)
-}
-
-
-/// Derivative of the Rectified Linear Unit (RELU) function for a scalar/number.
-pub fn relu_prime_component<C: TensorComponent>(number: C) -> C {
-    let zero = C::from_usize(0).unwrap();
-    let one = C::from_usize(1).unwrap();
-    if number < zero { zero } else { one }
-}
 
 #[cfg(test)]
 mod tests {
@@ -262,11 +269,15 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_sigmoid_inplace() {
-        let mut tensor = array![[0., 36.]];
-        sigmoid_inplace(&mut tensor);
-        let expected_tensor = array![[0.5, 0.9999999999999998]];
-        assert_eq!(tensor, expected_tensor);
+    mod test_functions {
+        use super::*;
+
+        #[test]
+        fn test_sigmoid_inplace() {
+            let mut tensor = array![[0., 36.]];
+            sigmoid_inplace(&mut tensor);
+            let expected_tensor = array![[0.5, 0.9999999999999998]];
+            assert_eq!(tensor, expected_tensor);
+        }
     }
 }
