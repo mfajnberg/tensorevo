@@ -1,6 +1,6 @@
 use ndarray::{Array2, array};
 
-use tensorevo::activation::Activation;
+use tensorevo::activation::{Activation, Registered};
 use tensorevo::cost_function::CostFunction;
 use tensorevo::individual::Individual;
 use tensorevo::layer::Layer;
@@ -18,7 +18,7 @@ fn test_sgd() {
                     [0.],
                     [0.],
                 ],
-                activation: Activation::from_name("relu").unwrap(),
+                activation: Activation::get("relu").unwrap(),
             },
             Layer{
                 weights: array![
@@ -29,7 +29,7 @@ fn test_sgd() {
                     [0.],
                     [0.],
                 ],
-                activation: Activation::from_name("relu").unwrap(),
+                activation: Activation::get("relu").unwrap(),
             },
         ],
         CostFunction::<Array2<f64>>::from_name("quadratic"),
