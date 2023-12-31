@@ -20,6 +20,8 @@ type TFunc<T> = fn(&T) -> T;
 /// This is used in the [`Layer`] struct.
 /// Facilitates (de-)serialization.
 ///
+/// See the **`Registerd`** trait implementation below for a usage example.
+///
 /// [`Layer`]: crate::layer::Layer
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Activation<T: TensorBase> {
@@ -77,7 +79,43 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 /// Registered instances can be retrieved by name via [`Registered::get`].
 ///
 /// # Example
-/// ...
+///
+/// ```rust
+/// use ndarray::{Array2, array};
+/// use num_traits::One;
+///
+/// use tensorevo::activation::{Activation, Registered};
+/// use tensorevo::tensor::TensorBase;
+///
+///
+/// fn identity<T: TensorBase>(t: &T) -> T {
+///     t.clone()
+/// }
+///
+/// fn one<T: TensorBase>(t: &T) -> T {
+///     TensorBase::from_num(T::Component::one(), t.shape())
+/// }
+///
+/// fn main() {
+///     type T = Array2::<f32>;
+///     // Register a custom activation function:
+///     Activation::<T>::new("identity", identity, one).register();
+///
+///     // Get a previously registered custom activation function:
+///     let activation = Activation::<T>::get("identity").unwrap();
+///     let t = array![[2., -1.]];
+///     assert_eq!(activation.call(&t), &t);
+///     assert_eq!(activation.call_derivative(&t), array![[1., 1.]]);
+///
+///     // No activation with the name `foo` was registered:
+///     assert_eq!(Activation::<T>::get("foo"), None);
+///
+///     // Common activation functions are available by default:
+///     let relu = Activation::<T>::get("relu").unwrap();
+///     assert_eq!(relu.call(&t), array![[2., 0.]]);
+///     assert_eq!(relu.call_derivative(&t), array![[1., 0.]]);
+/// }
+/// ```
 impl<T: 'static + TensorBase> Registered<String> for Activation<T> {
     /// Returns a reference to the name provided in the [`Activation::new`] constructor.
     fn key(&self) -> &String {
@@ -124,7 +162,7 @@ pub mod functions {
     
     /// Sigmoid function for a scalar/number.
     pub fn sigmoid_component<C: TensorComponent>(number: C) -> C {
-        let one = C::from_usize(1).unwrap();
+        let one = C::one();
         one / (one + (-number).exp())
     }
     
@@ -139,7 +177,7 @@ pub mod functions {
     
     /// Derivative of the sigmoid function for a scalar/number.
     pub fn sigmoid_prime_component<C: TensorComponent>(number: C) -> C {
-        let one = C::from_usize(1).unwrap();
+        let one = C::one();
         sigmoid_component(number) * (one - sigmoid_component(number))
     }
     
@@ -154,7 +192,7 @@ pub mod functions {
     
     /// Rectified Linear Unit (RELU) activation function for a scalar/number.
     pub fn relu_component<C: TensorComponent>(number: C) -> C {
-        let zero = C::from_usize(0).unwrap();
+        let zero = C::zero();
         if number < zero { zero } else { number }
     }
     
@@ -169,8 +207,8 @@ pub mod functions {
     
     /// Derivative of the Rectified Linear Unit (RELU) function for a scalar/number.
     pub fn relu_prime_component<C: TensorComponent>(number: C) -> C {
-        let zero = C::from_usize(0).unwrap();
-        let one = C::from_usize(1).unwrap();
+        let zero = C::zero();
+        let one = C::one();
         if number < zero { zero } else { one }
     }
 }

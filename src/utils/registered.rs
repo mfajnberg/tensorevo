@@ -16,13 +16,65 @@ use crate::utils::registry::{Registry, RegistryKey, RegistryValue};
 /// over the key type. This means that different key types will use different registries. Likewise,
 /// each type implementing [`Registered`] will have its own registry.
 ///
-/// For a practical use case see [`Registered::serialize_as_key`] and [`Registered::deserialize_from_key`].
+/// A practical use case is facilitating deserialization to function pointers from names.
+/// This trait is implemented for [`Activation`] and [`CostFunction`].
+///
+/// # Example
+///
+/// Say we have a struct with a function pointer field that we want to serialize and deserialize.
+/// For convenience we store a name for that function in a separate field. We can use that name as
+/// the registry key for a struct pointing to our function.
+///
+/// Implementing the [`serde`] traits is made very easy with the
+/// [`Registered::deserialize_from_key`]/[`Registered::serialize_as_key`] convenience functions.
+///
+/// ```rust
+/// use serde::{Deserialize, Deserializer, Serialize, Serializer};
+/// use tensorevo::utils::registered::Registered;
+///
+/// #[derive(Clone, Debug, PartialEq)]
+/// struct NamedFunction {
+///     name: String,
+///     function: fn() -> f32,
+/// }
+///
+/// impl Registered<String> for NamedFunction {
+///     fn key(&self) -> &String {
+///         &self.name
+///     }
+/// }
+///
+/// impl<'de> Deserialize<'de> for NamedFunction {
+///     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+///         Registered::deserialize_from_key(deserializer)
+///     }
+/// }
+///
+/// impl Serialize for NamedFunction {
+///     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+///         Registered::serialize_as_key(self, serializer)
+///     }
+/// }
+///
+/// fn zero() -> f32 { 0. }
+///
+/// fn main() {
+///     let named_zero = NamedFunction { name: "zero".to_owned(), function: zero };
+///     named_zero.register();  // This step is required for deserialization.
+///     let serialized = serde_json::to_string(&named_zero).unwrap();
+///     assert_eq!(&serialized, "\"zero\"");
+///     let deserialized: NamedFunction = serde_json::from_str(&serialized).unwrap();
+///     assert_eq!(deserialized, named_zero);
+/// }
+/// ```
 ///
 /// # Implementation detail
 /// Under the hood the registry uses the **[`generic_singleton`]** crate to initialize and access
 /// a [`Registry`] type ([`HashMap`] by default) with `K` type keys and `Self` type values.
 ///
 /// [`generic_singleton`]: https://docs.rs/generic_singleton/latest/generic_singleton/
+/// [`Activation`]: crate::activation::Activation
+/// [`CostFunction`]: crate::cost_function::CostFunction
 pub trait Registered<K>: Clone + RegistryValue
 where
     K: DeserializeOwned + RegistryKey + Serialize,
@@ -96,77 +148,12 @@ where
 
     /// Convenience method for implementing [`serde::Serialize`] for types that implement
     /// [`Registered`] such that instances are serialized through their keys.
-    ///
-    /// # Example
-    /// ```rust
-    /// use serde::{Serialize, Serializer};
-    /// use tensorevo::utils::registered::Registered;
-    ///
-    /// #[derive(Clone)]
-    /// struct NamedFunction {
-    ///     name: String,
-    ///     function: fn() -> f32,
-    /// }
-    ///
-    /// impl Registered<String> for NamedFunction {
-    ///     fn key(&self) -> &String {
-    ///         &self.name
-    ///     }
-    /// }
-    ///
-    /// impl Serialize for NamedFunction {
-    ///     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-    ///         Registered::serialize_as_key(self, serializer)
-    ///     }
-    /// }
-    ///
-    /// fn zero() -> f32 { 0. }
-    ///
-    /// fn main() {
-    ///     let named_zero = NamedFunction { name: "zero".to_owned(), function: zero };
-    ///     let serialized = serde_json::to_string(&named_zero).unwrap();
-    ///     assert_eq!(&serialized, "\"zero\"");
-    /// }
-    /// ```
     fn serialize_as_key<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.key().serialize(serializer)
     }
 
     /// Convenience function for implementing [`serde::Deserialize`] for types that implement
     /// [`Registered`] such that instances are deserialized from their names.
-    ///
-    /// # Example
-    /// ```rust
-    /// use serde::{Deserialize, Deserializer};
-    /// use tensorevo::utils::registered::Registered;
-    ///
-    /// #[derive(Clone, Debug, PartialEq)]
-    /// struct NamedFunction {
-    ///     name: String,
-    ///     function: fn() -> f32,
-    /// }
-    ///
-    /// impl Registered<String> for NamedFunction {
-    ///     fn key(&self) -> &String {
-    ///         &self.name
-    ///     }
-    /// }
-    ///
-    /// impl<'de> Deserialize<'de> for NamedFunction {
-    ///     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-    ///         Registered::deserialize_from_key(deserializer)
-    ///     }
-    /// }
-    ///
-    /// fn zero() -> f32 { 0. }
-    ///
-    /// fn main() {
-    ///     let named_zero = NamedFunction { name: "zero".to_owned(), function: zero };
-    ///     named_zero.register();
-    ///     let deserialized: NamedFunction = serde_json::from_str(" \"zero\" ").unwrap();
-    ///     assert_eq!(deserialized, named_zero);
-    /// }
-    /// ```
     fn deserialize_from_key<'de, D>(deserializer: D) -> Result<Self, D::Error>
     where D: Deserializer<'de>
     {
