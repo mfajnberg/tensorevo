@@ -84,12 +84,15 @@ where
     /// [`HashMap<K, Self>`] by default.
     type Registry: Registry<K, Self> = HashMap<K, Self>;
 
+    /// Returns the key (as a reference) under which the instance can be registered.
     fn key(&self) -> &K;
 
     /// Called by the default implementation of [`Registered::get_registry`] upon initialization.
     ///
     /// This means by default it will be called at most **once** for any `Registered<K>` type.
     /// Can be used to e.g. automatically fill the registry with initial instances.
+    ///
+    /// This function should not be called directly.
     ///
     /// # Arguments
     /// - `registry_lock` - Associated registry singleton wrapped in a borrowed [`RwLock`].
@@ -103,6 +106,9 @@ where
     /// When called for the first time on a specific `Registry<K>` type, the associated
     /// [`Registered::Registry`] is initialized and [`Registered::registry_post_init`] is called with it.
     /// Repeated calls simply return the registry singleton.
+    ///
+    /// This function should likely not be called directly.
+    /// Use [`Registered::register`] and [`Registered::get`] instead.
     ///
     /// # Returns
     /// Reference to the associated static registry singleton wrapped in a [`RwLock`].
@@ -139,6 +145,8 @@ where
     /// - `key` - Key under which the original instance was registered.
     ///
     /// # Returns
+    /// Clone of the instance with the specified `key` or [`None`] if none was registered under
+    /// that key.
     fn get(key: impl Into<K>) -> Option<Self> {
         let registry_lock = Self::get_registry();
         registry_lock.read().unwrap()
