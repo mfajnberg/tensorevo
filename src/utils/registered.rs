@@ -92,7 +92,7 @@ where
     /// This means by default it will be called at most **once** for any `Registered<K>` type.
     /// Can be used to e.g. automatically fill the registry with initial instances.
     ///
-    /// This function should not be called directly.
+    /// This function should probably not be called directly.
     ///
     /// # Arguments
     /// - `registry_lock` - Associated registry singleton wrapped in a borrowed [`RwLock`].
@@ -107,7 +107,7 @@ where
     /// [`Registered::Registry`] is initialized and [`Registered::registry_post_init`] is called with it.
     /// Repeated calls simply return the registry singleton.
     ///
-    /// This function should likely not be called directly.
+    /// This function should probably not be called directly.
     /// Use [`Registered::register`] and [`Registered::get`] instead.
     ///
     /// # Returns

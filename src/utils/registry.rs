@@ -53,12 +53,12 @@ where
 {
     /// Proxy for the [`HashMap::insert`] method.
     fn add(&mut self, key: K, value: V) -> Option<V> {
-        HashMap::<K, V>::insert(self, key, value)
+        self.insert(key, value)
     }
 
     /// Proxy for the [`HashMap::get`] method.
     fn get_ref(&self, key: &K) -> Option<&V> {
-        HashMap::<K, V>::get(&self, key)
+        self.get(key)
     }
 }
 

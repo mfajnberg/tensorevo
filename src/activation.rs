@@ -15,12 +15,12 @@ pub use self::functions::*;
 type TFunc<T> = fn(&T) -> T;
 
 
-/// Convenience struct to store an activation function together with its name and derivative.
+/// Contains a named activation function together with its derivative.
 ///
-/// This is used in the [`Layer`] struct.
-/// Facilitates (de-)serialization.
+/// Used primarily in the [`Layer`] struct.
 ///
-/// See the **`Registerd`** trait implementation below for a usage example.
+/// See the [**`Registerd`** trait implementation](#impl-Registered<String>-for-Activation<T>)
+/// below for a more general usage example.
 ///
 /// [`Layer`]: crate::layer::Layer
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,9 +31,18 @@ pub struct Activation<T: TensorBase> {
 }
 
 
-/// Methods for convenient construction and calling.
+/// Methods for construction and calling.
 impl<T: TensorBase> Activation<T> {
     /// Basic constructor.
+    ///
+    /// # Arguments
+    /// - `name` - Will be used for [serialization](#impl-Serialize-for-Activation<T>)
+    ///            and as the key in the static registry.
+    /// - `function` - The actual activation function.
+    /// - `derivative` - The derivative of `function`. (Needed for backpropagation.)
+    ///
+    /// # Returns
+    /// A new instance of `Activation<T>` with the provided values.
     pub fn new(name: impl Into<String>, function: TFunc<T>, derivative: TFunc<T>) -> Self {
         Self { name: name.into(), function, derivative }
     }

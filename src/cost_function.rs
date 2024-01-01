@@ -16,10 +16,12 @@ type TFunc<T> = fn(&T, &T) -> f32;
 type TFuncPrime<T> = fn(&T, &T) -> T;
 
 
-/// Convenience struct to store a cost function together with its name and derivative.
+/// Contains a named cost function together with its derivative.
 ///
-/// This is used in the [`Individual`] struct.
-/// Facilitates (de-)serialization.
+/// Used primarily in the [`Individual`] struct.
+///
+/// See the [**`Registerd`** trait implementation](#impl-Registered<String>-for-CostFunction<T>)
+/// below for a more general usage example.
 ///
 /// [`Individual`]: crate::individual::Individual
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -30,9 +32,18 @@ pub struct CostFunction<T: TensorBase> {
 }
 
 
-/// Methods for convenient construction and calling.
+/// Methods for construction and calling.
 impl<T: TensorBase> CostFunction<T> {
-    /// Basic constructor to manually define all fields.
+    /// Basic constructor.
+    ///
+    /// # Arguments
+    /// - `name` - Will be used for [serialization](#impl-Serialize-for-CostFunction<T>)
+    ///            and as the key in the static registry.
+    /// - `function` - The actual cost function.
+    /// - `derivative` - The derivative of `function`. (Needed for backpropagation.)
+    ///
+    /// # Returns
+    /// A new instance of `CostFunction<T>` with the provided values.
     pub fn new(name: impl Into<String>, function: TFunc<T>, derivative: TFuncPrime<T>) -> Self {
         Self { name: name.into(), function, derivative }
     }
