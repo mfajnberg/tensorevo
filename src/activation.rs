@@ -51,8 +51,8 @@ impl<T: TensorBase> Activation<T> {
     }
 
     /// Proxy for the derivative of the activation function.
-    pub fn d(&self, arg: &T) -> T {
-        (self.derivative)(arg)
+    pub fn d(&self, tensor: &T) -> T {
+        (self.derivative)(tensor)
     }
 }
 
