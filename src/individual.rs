@@ -325,8 +325,8 @@ mod tests {
     use ndarray::array;
     use tempfile::NamedTempFile;
 
-    use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
-    use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
+    use crate::activation::{Activation, Registered};
+    use crate::cost_function::CostFunction;
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
@@ -334,13 +334,13 @@ mod tests {
             "id": 0,
             "layers": [
                 {
-                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,1.0,2.0,3.0]},
-                    "biases":     {"v": 1, "dim": [2,1], "data": [4.0,5.0]},
+                    "weights":    {"v": 1, "dim": [2, 2], "data": [0.0, 1.0, 2.0, 3.0]},
+                    "biases":     {"v": 1, "dim": [2, 1], "data": [4.0, 5.0]},
                     "activation": "sigmoid"
                 },
                 {
-                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,-1.0,-2.0,-3.0]},
-                    "biases":     {"v": 1, "dim": [2,1], "data": [-4.0,-5.0]},
+                    "weights":    {"v": 1, "dim": [2, 2], "data": [0.0, -1.0, -2.0, -3.0]},
+                    "biases":     {"v": 1, "dim": [2, 1], "data": [-4.0, -5.0]},
                     "activation": "relu"
                 }
             ]
@@ -351,15 +351,15 @@ mod tests {
                 Layer::new(
                     array![[0., 1.], [2., 3.]],
                     array![[4.], [5.]],
-                    Activation::new("sigmoid", sigmoid, sigmoid_prime),
+                    Activation::get("sigmoid").unwrap(),
                 ),
                 Layer::new(
                     array![[0., -1.], [-2., -3.]],
                     array![[-4.], [-5.]],
-                    Activation::new("relu", relu, relu_prime),
+                    Activation::get("relu").unwrap(),
                 ),
             ],
-            cost_function: CostFunction::new("quadratic", quadratic, quadratic_prime),
+            cost_function: CostFunction::default(),
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
