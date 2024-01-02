@@ -22,7 +22,7 @@ impl<T: Tensor> Layer<T> {
 
     pub fn feed_forward(&self, input: &T) -> (T, T) {
         let weighted_input = &self.weights.dot(input) + &self.biases;
-        let activation = self.activation.call(&weighted_input);
+        let activation = (self.activation)(&weighted_input);
         (weighted_input, activation)
     }
 }

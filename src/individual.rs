@@ -148,9 +148,9 @@ impl<T: Tensor> Individual<T> {
         // Activation of the last layer, i.e. the network's output:
         let output = activations.last().unwrap();
         // Derivative of the last layer's activation function with respect to its weighted input:
-        let activation_derivative = self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        let activation_derivative = self.layers[num_layers - 1].activation.d(weighted_input);
         // Derivative of the cost function with respect to the last layer's activation:
-        let cost_derivative = self.cost_function.call_derivative(output, desired_output);
+        let cost_derivative = self.cost_function.d(output, desired_output);
         // Delta of the last layer:
         let delta = cost_derivative * activation_derivative;
         // Calculate and add the last layer's gradient components first.
@@ -164,7 +164,7 @@ impl<T: Tensor> Individual<T> {
             // Activation of the previous layer:
             let previous_activation = if layer_num > 0 { &activations[layer_num - 1] } else { input };
             // Derivative of the layer's activation function with respect to its weighted input:
-            let activation_derivative = self.layers[layer_num].activation.call_derivative(weighted_input);
+            let activation_derivative = self.layers[layer_num].activation.d(weighted_input);
             // Delta of the layer:
             let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
             // Calculate and add the layer's gradient components.
@@ -237,7 +237,7 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// The error value
     pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
-        self.cost_function.call(&self.forward_pass(input), desired_output)
+        (self.cost_function)(&self.forward_pass(input), desired_output)
     }
 }
 
