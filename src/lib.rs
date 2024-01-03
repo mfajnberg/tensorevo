@@ -1,6 +1,6 @@
 //! Rust library for creating, training and evolving neural networks.
 
-#![feature(associated_type_defaults, iter_array_chunks, map_try_insert, trait_alias)]
+#![feature(associated_type_defaults, fn_traits, iter_array_chunks, map_try_insert, trait_alias, unboxed_closures)]
 
 pub mod activation;
 pub mod component;

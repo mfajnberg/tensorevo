@@ -32,6 +32,9 @@ pub struct Activation<T: TensorBase> {
 
 
 /// Methods for construction and calling.
+///
+/// Given some `act: Activation<T>` and a `tensor: impl TensorBase` you can call the activation
+/// function simply by doing **`act(&tensor)`** and the derivative via **`act.d(&tensor)`**.
 impl<T: TensorBase> Activation<T> {
     /// Basic constructor.
     ///
@@ -47,14 +50,68 @@ impl<T: TensorBase> Activation<T> {
         Self { name: name.into(), function, derivative }
     }
 
-    /// Proxy for the actual activation function.
-    pub fn call(&self, tensor: &T) -> T {
-        (self.function)(tensor)
-    }
-
     /// Proxy for the derivative of the activation function.
-    pub fn call_derivative(&self, tensor: &T) -> T {
+    pub fn d(&self, tensor: &T) -> T {
         (self.derivative)(tensor)
+    }
+}
+
+
+/// Makes `Activation<T>` callable by value (i.e. consuming the instance).
+///
+/// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
+impl<T: TensorBase> FnOnce<(&T,)> for Activation<T> {
+    type Output = T;
+
+    /// Proxy for the actual underlying activation function.
+    extern "rust-call" fn call_once(self, args: (&T,)) -> Self::Output {
+        (self.function)(args.0)
+    }
+}
+
+
+/// Makes `Activation<T>` callable by mutable reference.
+///
+/// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
+impl<T: TensorBase> FnMut<(&T,)> for Activation<T> {
+    /// Proxy for the actual underlying activation function.
+    extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
+        (self.function)(args.0)
+    }
+}
+
+
+/// Makes `Activation<T>` callable by immutable reference.
+///
+/// This allows you to use the call operator `( )` on instances and essentially treat them as functions.
+///
+/// # Example
+///
+/// ```rust
+/// use ndarray::array;
+/// use tensorevo::activation::Activation;
+/// use tensorevo::tensor::TensorBase;
+///
+/// fn zero_function<T: TensorBase>(t: &T) -> T {
+///     T::zeros(t.shape())
+/// }
+///
+/// fn main() {
+///     let a = Activation::new("zero", zero_function, zero_function);
+///     let x = array![[1., 2.]];
+///     let y = a(&x);
+///     assert_eq!(y, array![[0., 0.]]);
+/// }
+/// ```
+///
+/// In the example above, activation function and derivative are identical.
+/// In practice they are obviously different functions.
+/// The call operator always calls the actual activation function.
+/// To call the derivative use the [`Activation::d`] method.
+impl<T: TensorBase> Fn<(&T,)> for Activation<T> {
+    /// Proxy for the actual underlying activation function.
+    extern "rust-call" fn call(&self, args: (&T,)) -> Self::Output {
+        (self.function)(args.0)
     }
 }
 
@@ -81,6 +138,7 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 /// default under the following keys:
 /// - `sigmoid` (see [`sigmoid`] and [`sigmoid_prime`])
 /// - `relu` (see [`relu`] and [`relu_prime`])
+/// - `identity` (see [`identity`] and [`to_one`])
 ///
 /// Custom instances registered via [`Registered::register`] under those names will replace the
 /// corresponding default implementations.
@@ -94,35 +152,36 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 /// use num_traits::One;
 ///
 /// use tensorevo::activation::{Activation, Registered};
-/// use tensorevo::tensor::TensorBase;
+/// use tensorevo::tensor::TensorOp;
 ///
-///
-/// fn identity<T: TensorBase>(t: &T) -> T {
-///     t.clone()
+/// fn double<T: TensorOp>(t: &T) -> T {
+///     t + t
 /// }
 ///
-/// fn one<T: TensorBase>(t: &T) -> T {
-///     TensorBase::from_num(T::Component::one(), t.shape())
+/// fn to_two<T: TensorOp>(t: &T) -> T {
+///     let ones = T::from_num(T::Component::one(), t.shape());
+///     &ones + &ones
 /// }
 ///
 /// fn main() {
 ///     type T = Array2::<f32>;
+///
 ///     // Register a custom activation function:
-///     Activation::<T>::new("identity", identity, one).register();
+///     Activation::<T>::new("double", double, to_two).register();
 ///
 ///     // Get a previously registered custom activation function:
-///     let activation = Activation::<T>::get("identity").unwrap();
-///     let t = array![[2., -1.]];
-///     assert_eq!(activation.call(&t), &t);
-///     assert_eq!(activation.call_derivative(&t), array![[1., 1.]]);
+///     let activation = Activation::<T>::get("double").unwrap();
+///     let input = array![[2., -1.]];
+///     assert_eq!(activation(&input), array![[4., -2.]]);
+///     assert_eq!(activation.d(&input), array![[2., 2.]]);
 ///
 ///     // No activation with the name `foo` was registered:
 ///     assert_eq!(Activation::<T>::get("foo"), None);
 ///
 ///     // Common activation functions are available by default:
 ///     let relu = Activation::<T>::get("relu").unwrap();
-///     assert_eq!(relu.call(&t), array![[2., 0.]]);
-///     assert_eq!(relu.call_derivative(&t), array![[1., 0.]]);
+///     assert_eq!(relu(&input), array![[2., 0.]]);
+///     assert_eq!(relu.d(&input), array![[1., 0.]]);
 /// }
 /// ```
 impl<T: 'static + TensorBase> Registered<String> for Activation<T> {
@@ -145,12 +204,18 @@ impl<T: 'static + TensorBase> Registered<String> for Activation<T> {
             "relu".to_owned(),
             Self::new("relu".to_owned(), relu, relu_prime),
         );
+        let _ = registry.add(
+            "identity".to_owned(),
+            Self::new("identity".to_owned(), identity, to_one),
+        );
     }
 }
 
 
 /// Reference implementations of some common activation functions as well as their derivatives.
 pub mod functions {
+    use num_traits::One;
+
     use super::*;
 
     /// Reference implementation of the sigmoid activation function.
@@ -220,12 +285,24 @@ pub mod functions {
         let one = C::one();
         if number < zero { zero } else { one }
     }
+
+
+    /// Identity function returning a clone of the input `tensor`.
+    pub fn identity<T: TensorBase>(tensor: &T) -> T {
+        tensor.clone()
+    }
+
+
+    /// Returns a tensor filled with ones with the shape of `tensor`. (Derivative of the identity.)
+    pub fn to_one<T: TensorBase>(tensor: &T) -> T {
+        T::from_num(T::Component::one(), tensor.shape())
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
-    use ndarray::array;
+    use ndarray::{Array2, array};
 
     use super::*;
 
@@ -233,39 +310,58 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_register_and_from_name() {
-            use ndarray::Array2;
+        fn test_new() {
+            let activation = Activation::<Array2<f32>>::new("relu", relu, relu_prime);
+            assert_eq!(
+                activation,
+                Activation { name: "relu".to_owned(), function: relu, derivative: relu_prime },
+            );
+        }
 
+        #[test]
+        fn test_d() {
+            let tensor = array![[-1., 2.]];
+            let activation = Activation {
+                name: "relu".to_owned(),
+                function: relu,
+                derivative: relu_prime,
+            };
+            let output = activation.d(&tensor);
+            let expected_output = array![[0., 1.]];
+            assert_eq!(output, expected_output);
+        }
+
+        #[test]
+        fn test_registered() {
             type NDActivation = Activation<Array2<f32>>;
 
-            let name = "foo".to_owned();
-
+            // Nothing registered under the key "foo".
             let option = NDActivation::get("foo");
             assert_eq!(option, None);
 
             // Register under that name for the first time.
-            let option = NDActivation::new(name.clone(), relu, relu_prime).register();
+            let option = NDActivation::new("foo", relu, relu_prime).register();
             assert_eq!(option, None);
 
             // Get from registry by name.
             let option = NDActivation::get("foo");
             assert_eq!(
                 option,
-                Some(Activation { name: name.clone(), function: relu, derivative: relu_prime }),
+                Some(Activation { name: "foo".to_owned(), function: relu, derivative: relu_prime }),
             );
 
             // Register different one under the same name. Should return the previous one.
-            let option = NDActivation::new(name.clone(), sigmoid, sigmoid_prime).register();
+            let option = NDActivation::new("foo", sigmoid, sigmoid_prime).register();
             assert_eq!(
                 option,
-                Some(Activation { name: name.clone(), function: relu, derivative: relu_prime }),
+                Some(Activation { name: "foo".to_owned(), function: relu, derivative: relu_prime }),
             );
 
             // Get the new one from the registry by name.
             let option = NDActivation::get("foo");
             assert_eq!(
                 option,
-                Some(Activation { name: name.clone(), function: sigmoid, derivative: sigmoid_prime }),
+                Some(Activation { name: "foo".to_owned(), function: sigmoid, derivative: sigmoid_prime }),
             );
 
             // Get default `sigmoid` from the registry.
@@ -275,9 +371,8 @@ mod tests {
                 Some(Activation { name: "sigmoid".to_owned(), function: sigmoid, derivative: sigmoid_prime }),
             );
 
-            // Replace it with a different `Activation` instance.
-            fn identity<T: TensorBase>(t: &T) -> T { t.clone() }
-            let option = NDActivation::new("sigmoid", identity, identity).register();
+            // Replace it with a different `Activation` instance. (For illustrative purposes only.)
+            let option = NDActivation::new("sigmoid", identity, to_one).register();
             assert_eq!(
                 option,
                 Some(Activation { name: "sigmoid".to_owned(), function: sigmoid, derivative: sigmoid_prime }),
@@ -285,33 +380,30 @@ mod tests {
             let option = NDActivation::get("sigmoid");
             assert_eq!(
                 option,
-                Some(Activation { name: "sigmoid".to_owned(), function: identity, derivative: identity }),
+                Some(Activation { name: "sigmoid".to_owned(), function: identity, derivative: to_one }),
             );
         }
 
         #[test]
-        fn test_call() {
+        fn test_fn_traits() {
             let tensor = array![[-1., 2.]];
-            let activation = Activation {
+            let mut activation = Activation {
                 name: "relu".to_owned(),
                 function: relu,
                 derivative: relu_prime
             };
-            let output = activation.call(&tensor);
             let expected_output = array![[0., 2.]];
-            assert_eq!(output, expected_output);
-        }
 
-        #[test]
-        fn test_call_derivative() {
-            let tensor = array![[-1., 2.]];
-            let activation = Activation{
-                name: "relu".to_owned(),
-                function: relu,
-                derivative: relu_prime
-            };
-            let output = activation.call_derivative(&tensor);
-            let expected_output = array![[0., 1.]];
+            // Receiver borrowed:
+            let output = activation(&tensor);
+            assert_eq!(output, expected_output);
+
+            // Receiver mutably borrowed:
+            let output = activation.call_mut((&tensor,));
+            assert_eq!(output, expected_output);
+
+            // Receiver moved:
+            let output = activation.call_once((&tensor,));
             assert_eq!(output, expected_output);
         }
     }

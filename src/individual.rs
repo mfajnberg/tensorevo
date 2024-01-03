@@ -21,8 +21,8 @@ use crate::cost_function::CostFunction;
 
 /// Neural network with evolutionary methods.
 ///
-/// Derives the [`Deserialize`] and [`Serialize`] traits from [`serde`],
-/// as well as [`PartialEq`] and [`Debug`].
+/// Can be called as a function to feed forward an input through the entire network.
+/// (See [`Fn` implementation](#impl-Fn<(%26T,)>-for-Individual<T>) below.)
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
 pub struct Individual<T: Tensor> {
@@ -66,10 +66,6 @@ impl<T: Tensor> Individual<T> {
         }
     }
 
-    pub fn id(&self) -> u128 {
-        self.id
-    }
-
     /// Load an individual from a json file
     /// 
     /// # Arguments
@@ -81,19 +77,14 @@ impl<T: Tensor> Individual<T> {
         Ok(serde_json::from_str(read_to_string(path)?.as_str())?)
     }
 
-    pub fn num_layers(&self) -> usize {
-        self.layers.len()
+    /// Returns the unique identifier of the `Individual` instance.
+    pub fn id(&self) -> u128 {
+        self.id
     }
 
-    /// Performs a full forward pass for a given input and returns the network's output.
-    ///
-    /// # Arguments
-    /// * `input` - [Tensor] with a shape that matches the first/input layer
-    ///
-    /// # Returns
-    /// Output tensor from the last layer
-    pub fn forward_pass(&self, input: &T) -> T {
-        self.layers.iter().fold(input.clone(), |output, layer| layer.feed_forward(&output).1)
+    /// Returns the number of layers (**not** including the input layer) in the network.
+    pub fn num_layers(&self) -> usize {
+        self.layers.len()
     }
 
     /// Passes the `input` through the network and returns the intermediate results of each layer.
@@ -148,9 +139,9 @@ impl<T: Tensor> Individual<T> {
         // Activation of the last layer, i.e. the network's output:
         let output = activations.last().unwrap();
         // Derivative of the last layer's activation function with respect to its weighted input:
-        let activation_derivative = self.layers[num_layers - 1].activation.call_derivative(weighted_input);
+        let activation_derivative = self.layers[num_layers - 1].activation.d(weighted_input);
         // Derivative of the cost function with respect to the last layer's activation:
-        let cost_derivative = self.cost_function.call_derivative(output, desired_output);
+        let cost_derivative = self.cost_function.d(output, desired_output);
         // Delta of the last layer:
         let delta = cost_derivative * activation_derivative;
         // Calculate and add the last layer's gradient components first.
@@ -164,7 +155,7 @@ impl<T: Tensor> Individual<T> {
             // Activation of the previous layer:
             let previous_activation = if layer_num > 0 { &activations[layer_num - 1] } else { input };
             // Derivative of the layer's activation function with respect to its weighted input:
-            let activation_derivative = self.layers[layer_num].activation.call_derivative(weighted_input);
+            let activation_derivative = self.layers[layer_num].activation.d(weighted_input);
             // Delta of the layer:
             let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
             // Calculate and add the layer's gradient components.
@@ -237,9 +228,94 @@ impl<T: Tensor> Individual<T> {
     /// # Returns
     /// The error value
     pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
-        self.cost_function.call(&self.forward_pass(input), desired_output)
+        (self.cost_function)(&self(input), desired_output)
     }
 }
+
+
+/// Makes `Individual<T>` callable by value (i.e. consuming the instance).
+///
+/// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
+/// (See [`Individual::call`].)
+impl<T: Tensor> FnOnce<(&T,)> for Individual<T> {
+    type Output = T;
+
+    /// See [`Individual::call`].
+    extern "rust-call" fn call_once(self, args: (&T,)) -> Self::Output {
+        self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
+    }
+}
+
+
+/// Makes `Individual<T>` callable by mutable reference.
+///
+/// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
+/// (See [`Individual::call`].)
+impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
+    /// See [`Individual::call`].
+    extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
+        self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
+    }
+}
+
+
+/// Makes `Individual<T>` callable by immutable reference.
+///
+/// This allows you to use the call operator `( )` on instances and essentially treat them as functions.
+///
+/// # Example
+///
+/// ```rust
+/// use ndarray::array;
+/// use tensorevo::activation::{Activation, Registered};
+/// use tensorevo::cost_function::CostFunction;
+/// use tensorevo::individual::Individual;
+/// use tensorevo::layer::Layer;
+///
+/// fn main() {
+///     // Simply doubles the input and subtracts 1 in the first component.
+///     let individual = Individual::new(
+///         vec![
+///             Layer {
+///                 weights: array![
+///                     [2., 0.],
+///                     [0., 2.],
+///                 ],
+///                 biases: array![
+///                     [-1.],
+///                     [ 0.],
+///                 ],
+///                 activation: Activation::get("identity").unwrap(),
+///             },
+///         ],
+///         CostFunction::default(),
+///     );
+///
+///     let input = array![
+///         [ 2.],
+///         [-2.],
+///     ];
+///     let expected_output = array![
+///         [ 3.],
+///         [-4.],
+///     ];
+///     let output = individual(&input);
+///     assert_eq!(output, expected_output);
+/// }
+/// ```
+impl<T: Tensor> Fn<(&T,)> for Individual<T> {
+    /// Performs a full forward pass for a given input and returns the network's output.
+    ///
+    /// # Arguments
+    /// * `input` - [Tensor] with a shape that matches the input layer.
+    ///
+    /// # Returns
+    /// Output tensor returned from the last layer
+    extern "rust-call" fn call(&self, args: (&T,)) -> Self::Output {
+        self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -249,8 +325,8 @@ mod tests {
     use ndarray::array;
     use tempfile::NamedTempFile;
 
-    use crate::activation::{Activation, sigmoid, sigmoid_prime, relu, relu_prime};
-    use crate::cost_function::{CostFunction, quadratic, quadratic_prime};
+    use crate::activation::{Activation, Registered};
+    use crate::cost_function::CostFunction;
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
@@ -258,13 +334,13 @@ mod tests {
             "id": 0,
             "layers": [
                 {
-                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,1.0,2.0,3.0]},
-                    "biases":     {"v": 1, "dim": [2,1], "data": [4.0,5.0]},
+                    "weights":    {"v": 1, "dim": [2, 2], "data": [0.0, 1.0, 2.0, 3.0]},
+                    "biases":     {"v": 1, "dim": [2, 1], "data": [4.0, 5.0]},
                     "activation": "sigmoid"
                 },
                 {
-                    "weights":    {"v": 1, "dim": [2,2], "data": [0.0,-1.0,-2.0,-3.0]},
-                    "biases":     {"v": 1, "dim": [2,1], "data": [-4.0,-5.0]},
+                    "weights":    {"v": 1, "dim": [2, 2], "data": [0.0, -1.0, -2.0, -3.0]},
+                    "biases":     {"v": 1, "dim": [2, 1], "data": [-4.0, -5.0]},
                     "activation": "relu"
                 }
             ]
@@ -275,15 +351,15 @@ mod tests {
                 Layer::new(
                     array![[0., 1.], [2., 3.]],
                     array![[4.], [5.]],
-                    Activation::new("sigmoid", sigmoid, sigmoid_prime),
+                    Activation::get("sigmoid").unwrap(),
                 ),
                 Layer::new(
                     array![[0., -1.], [-2., -3.]],
                     array![[-4.], [-5.]],
-                    Activation::new("relu", relu, relu_prime),
+                    Activation::get("relu").unwrap(),
                 ),
             ],
-            cost_function: CostFunction::new("quadratic", quadratic, quadratic_prime),
+            cost_function: CostFunction::default(),
         };
         let mut individual_file = NamedTempFile::new()?;
         individual_file.write_all(individual_json.as_bytes())?;
