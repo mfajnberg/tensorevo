@@ -6,6 +6,7 @@ use std::fmt::Debug;
 use std::fs::read_to_string;
 use std::io::Error as IOError;
 use std::path::Path;
+use std::ops::Index;
 
 use log::trace;
 use num_traits::FromPrimitive;
@@ -313,6 +314,18 @@ impl<T: Tensor> Fn<(&T,)> for Individual<T> {
     /// Output tensor returned from the last layer
     extern "rust-call" fn call(&self, args: (&T,)) -> Self::Output {
         self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
+    }
+}
+
+
+/// Allows access to layers by index.
+/// 
+/// Index 0 corresponds to the first hidden layer.
+impl<T: Tensor> Index<usize> for Individual<T> {
+    type Output = Layer<T>;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        self.layers.index(idx)
     }
 }
 
