@@ -19,6 +19,15 @@ use crate::layer::Layer;
 use crate::tensor::Tensor;
 use crate::cost_function::CostFunction;
 
+#[cfg(test)]
+use mocktopus::macros::*;
+
+
+#[cfg_attr(test, mockable)]
+fn generate_uuid_v4() -> u128 {
+    Uuid::new_v4().as_u128()
+}
+
 
 /// Neural network with evolutionary methods.
 ///
@@ -61,7 +70,7 @@ impl<T: Tensor> Individual<T> {
     /// New [`Individual`] with the given layers
     pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
         Self {
-            id: Uuid::new_v4().as_u128(),
+            id: generate_uuid_v4(),
             layers,
             cost_function,
         }
@@ -335,11 +344,33 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    use ndarray::array;
+    use mocktopus::mocking::*;
+    use ndarray::{Array2, array};
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, Registered};
     use crate::cost_function::CostFunction;
+
+    type T = Array2<f64>;
+
+    #[test]
+    fn test_new() {
+        let id = 42;
+        generate_uuid_v4.mock_safe(move || MockResult::Return(id));
+        let layers = vec![
+            Layer::new(
+                array![[0.]],
+                array![[0.]],
+                Activation::get("identity").unwrap(),
+            ),
+        ];
+        let cost_function = CostFunction::default();
+        let individual = Individual::<T>::new(layers.clone(), cost_function.clone());
+        assert_eq!(
+            individual,
+            Individual { id, layers, cost_function },
+        );
+    }
 
     #[test]
     fn test_from_file() -> Result<(), LoadError> {
@@ -358,7 +389,7 @@ mod tests {
                 }
             ]
         }"#;
-        let individual_expected = Individual{
+        let individual_expected = Individual {
             id: 0,
             layers: vec![
                 Layer::new(
@@ -379,5 +410,57 @@ mod tests {
         let individual_loaded = Individual::from_file(individual_file.path())?;
         assert_eq!(individual_expected, individual_loaded);
         Ok(())
+    }
+
+    #[test]
+    fn test_id() {
+        let individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::<T>::default() };
+        assert_eq!(individual.id(), 69420);
+    }
+
+    #[test]
+    fn test_num_layers() {
+        let mut individual = Individual { id: 123, layers: vec![], cost_function: CostFunction::default() };
+        assert_eq!(individual.num_layers(), 0);
+        individual.layers.push(Layer::new(array![[0.]], array![[0.]], Activation::get("sigmoid").unwrap()));
+        assert_eq!(individual.num_layers(), 1);
+    }
+
+    #[test]
+    fn test_fn_traits() {
+        let mut individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::default() };
+        let input = array![[1.]];
+
+        // Receiver borrowed:
+        let output = individual(&input);
+        assert_eq!(output, input);
+        // Add a layer:
+        individual.layers.push(Layer::new(array![[2.]], array![[1.]], Activation::get("identity").unwrap()));
+        let output = individual(&input);
+        assert_eq!(output, array![[3.]]);
+        // Add another layer:
+        individual.layers.push(Layer::new(array![[1.]], array![[-3.]], Activation::get("sigmoid").unwrap()));
+        let output = individual(&input);
+        assert_eq!(output, array![[0.5]]);
+
+        // Receiver mutably borrowed:
+        let output = individual.call_mut((&input,));
+        assert_eq!(output, array![[0.5]]);
+
+        // Receiver moved:
+        let output = individual.call_once((&input,));
+        assert_eq!(output, array![[0.5]]);
+    }
+
+    #[test]
+    fn test_index() {
+        let id = 1;
+        let layer_0 = Layer::new(array![[1.]], array![[0.]], Activation::get("identity").unwrap());
+        let layer_1 = Layer::new(array![[2.]], array![[1.]], Activation::get("identity").unwrap());
+        let layers = vec![layer_0.clone(), layer_1.clone()];
+        let cost_function = CostFunction::default();
+        let individual = Individual { id, layers, cost_function };
+        assert_eq!(individual[0], layer_0);
+        assert_eq!(individual[1], layer_1);
     }
 } 

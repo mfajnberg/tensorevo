@@ -20,5 +20,8 @@ tempfile = "*"
 thiserror = "*"
 uuid = { version = "*", features = ["v4", "fast-rng"] }
 
+[dev-dependencies]
+mocktopus = "*"
+
 [lints.clippy]
 needless_return = "allow"
