@@ -97,6 +97,9 @@ impl<T: Tensor> Individual<T> {
         self.layers.len()
     }
 
+    pub fn get_cost_function(&self) -> &CostFunction<T> {
+        &self.cost_function
+    }
     /// Passes the `input` through the network and returns the intermediate results of each layer.
     ///
     /// # Arguments
@@ -338,6 +341,7 @@ impl<T: Tensor> Index<usize> for Individual<T> {
     }
 }
 
+// TODO: Implement the appropriate Iterator traits (either Iterator or IntoInterator)
 
 #[cfg(test)]
 mod tests {

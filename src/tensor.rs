@@ -48,6 +48,8 @@ pub trait TensorBase:
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
     
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ((usize, usize), &mut Self::Component)>;
+
     /// Returns the sum of all rows (0) or columns (1) as a new tensor.
     fn sum_axis(&self, axis: usize) -> Self;
 }
@@ -182,6 +184,10 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(C) -> C {
         self.mapv_inplace(f)
+    }
+
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ((usize, usize), &mut Self::Component)> {
+        Array2::<C>::indexed_iter_mut(self)
     }
 
     fn sum_axis(&self, axis: usize) -> Self {
