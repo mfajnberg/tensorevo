@@ -113,29 +113,29 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
     }
     let mut layers = Vec::with_capacity(num_layers);
     let mut rng = thread_rng();
-    let cols_1 = parent_1[0].weights.shape().1;
-    let cols_2 = parent_2[0].weights.shape().1;
-    let mut cols = rng.gen_range(min(cols_1, cols_2)..=max(cols_1, cols_2));
-    for i in 0..num_layers {   
+    let cols_p1 = parent_1[0].weights.shape().1;
+    let cols_p2 = parent_2[0].weights.shape().1;
+    let mut cols = rng.gen_range(min(cols_p1, cols_p2)..=max(cols_p1, cols_p2));
+    for (layer_p1, layer_p2) in parent_1.iter().zip(parent_2) {
         // weights
-        let (rows_1, cols_1) = parent_1[i].weights.shape();
-        let (rows_2, cols_2) = parent_2[i].weights.shape();
-        let rows = rng.gen_range(min(rows_1, rows_2)..=max(rows_1, rows_2));
+        let (rows_p1, cols_p1) = layer_p1.weights.shape();
+        let (rows_p2, cols_p2) = layer_p2.weights.shape();
+        let rows = rng.gen_range(min(rows_p1, rows_p2)..=max(rows_p1, rows_p2));
         let mut weights = T::zeros((rows, cols));
         for ((row, col), component) in weights.indexed_iter_mut() {
             // both parents have a component at row|col
-            if rows_1 > row && cols_1 > col && rows_2 > row && cols_2 > col {
-                let weight_1 = parent_1[i].weights[[row, col]];
-                let weight_2 = parent_2[i].weights[[row, col]];
-                *component = *[weight_1, weight_2].choose(&mut rng).unwrap();
+            if row < rows_p1 && col < cols_p1 && row < rows_p2 && col < cols_p2 {
+                let weight_p1 = layer_p1.weights[[row, col]];
+                let weight_p2 = layer_p2.weights[[row, col]];
+                *component = *[weight_p1, weight_p2].choose(&mut rng).unwrap();
             }
             // only parent_1 has a component at row|col
-            else if rows_1 > row && cols_1 > col {
-                *component = parent_1[i].weights[[row, col]];
+            else if row < rows_p1 && col < cols_p1 {
+                *component = layer_p1.weights[[row, col]];
             }
             // only parent_2 has a component at row|col
-            else if rows_2 > row && cols_2 > col {
-                *component = parent_2[i].weights[[row, col]];
+            else if row < rows_p2 && col < cols_p2 {
+                *component = layer_p2.weights[[row, col]];
             }
             // neither has a component at row|col
             else {
@@ -146,22 +146,22 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
         let mut biases = T::zeros((rows, 1));
         for ((row, _), component) in biases.indexed_iter_mut() {
             // both parents have a component at row
-            if rows_1 > row && rows_2 > row {
-                let bias_1 = parent_1[i].biases[[row, 0]];
-                let bias_2 = parent_2[i].biases[[row, 0]];
-                *component = *[bias_1, bias_2].choose(&mut rng).unwrap();
+            if rows_p1 > row && rows_p2 > row {
+                let bias_p1 = layer_p1.biases[[row, 0]];
+                let bias_p2 = layer_p2.biases[[row, 0]];
+                *component = *[bias_p1, bias_p2].choose(&mut rng).unwrap();
             }
             // only parent_1 has a component at row
-            else if rows_1 > row {
-                *component = parent_1[i].biases[[row, 0]];
+            else if rows_p1 > row {
+                *component = layer_p1.biases[[row, 0]];
             }
             // only parent_2 has a component at row
             else {
-                *component = parent_2[i].biases[[row, 0]];
+                *component = layer_p2.biases[[row, 0]];
             }
         }
         // activation
-        let activation = (*[&parent_1[i].activation, &parent_2[i].activation].choose(&mut rng).unwrap()).clone();
+        let activation = (*[&layer_p1.activation, &layer_p2.activation].choose(&mut rng).unwrap()).clone();
 
         layers.push(Layer::new(weights, biases, activation));
         cols = rows;

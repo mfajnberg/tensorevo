@@ -7,6 +7,7 @@ use std::fs::read_to_string;
 use std::io::Error as IOError;
 use std::path::Path;
 use std::ops::Index;
+use std::slice::Iter;
 
 use log::trace;
 use num_traits::FromPrimitive;
@@ -97,9 +98,16 @@ impl<T: Tensor> Individual<T> {
         self.layers.len()
     }
 
+    /// Returns an iterator over the individual's layers.
+    pub fn iter(&self) -> Iter<'_, Layer<T>> {
+        self.into_iter()
+    }
+
+    /// Returns a reference to the individual's cost function.
     pub fn get_cost_function(&self) -> &CostFunction<T> {
         &self.cost_function
     }
+
     /// Passes the `input` through the network and returns the intermediate results of each layer.
     ///
     /// # Arguments
@@ -341,7 +349,17 @@ impl<T: Tensor> Index<usize> for Individual<T> {
     }
 }
 
-// TODO: Implement the appropriate Iterator traits (either Iterator or IntoInterator)
+
+/// Allows turning a reference to an `Individual` into an iterator over [`Layer`] references.
+impl<'a, T: Tensor> IntoIterator for &'a Individual<T> {
+    type Item = &'a Layer<T>;
+    type IntoIter = Iter<'a, Layer<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.layers.iter()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
