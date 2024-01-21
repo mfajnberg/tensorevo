@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use ordered_float::OrderedFloat;
 use rand::distributions::Slice;
+use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, thread_rng};
 
@@ -105,6 +106,65 @@ pub fn select<T: Tensor>(population: &mut Population<T>, species_key: &str) -> V
 }
 
 
+
+fn crossover_layer_weights<T: Tensor>(
+    new_weights: &mut T,
+    weights_p1: &T,
+    weights_p2: &T,
+    rng: &mut ThreadRng,
+) {
+    let (rows_p1, cols_p1) = weights_p1.shape();
+    let (rows_p2, cols_p2) = weights_p2.shape();
+    for ((row, col), component) in new_weights.indexed_iter_mut() {
+        // both parents have a component at row|col
+        if row < rows_p1 && col < cols_p1 && row < rows_p2 && col < cols_p2 {
+            let weight_p1 = weights_p1[[row, col]];
+            let weight_p2 = weights_p2[[row, col]];
+            *component = *[weight_p1, weight_p2].choose(rng).unwrap();
+        }
+        // only parent_1 has a component at row|col
+        else if row < rows_p1 && col < cols_p1 {
+            *component = weights_p1[[row, col]];
+        }
+        // only parent_2 has a component at row|col
+        else if row < rows_p2 && col < cols_p2 {
+            *component = weights_p2[[row, col]];
+        }
+        // neither has a component at row|col
+        else {
+            // TODO: maybe initialize new component
+        }
+    }
+}
+
+
+fn crossover_layer_biases<T: Tensor>(
+    new_biases: &mut T,
+    biases_p1: &T,
+    biases_p2: &T,
+    rng: &mut ThreadRng,
+) {
+    let rows_p1 = biases_p1.shape().0;
+    let rows_p2 = biases_p2.shape().0;
+    for ((row, _), component) in new_biases.indexed_iter_mut() {
+        // both parents have a component at row
+        if rows_p1 > row && rows_p2 > row {
+            let bias_p1 = biases_p1[[row, 0]];
+            let bias_p2 = biases_p2[[row, 0]];
+            *component = *[bias_p1, bias_p2].choose(rng).unwrap();
+        }
+        // only parent_1 has a component at row
+        else if rows_p1 > row {
+            *component = biases_p1[[row, 0]];
+        }
+        // only parent_2 has a component at row
+        else {
+            *component = biases_p2[[row, 0]];
+        }
+    }
+}
+
+
 // TODO: Factor out lots of things
 pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) -> Individual<T> {
     let num_layers = parent_1.num_layers();
@@ -113,58 +173,20 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
     }
     let mut layers = Vec::with_capacity(num_layers);
     let mut rng = thread_rng();
-    let cols_p1 = parent_1[0].weights.shape().1;
-    let cols_p2 = parent_2[0].weights.shape().1;
-    let mut cols = rng.gen_range(min(cols_p1, cols_p2)..=max(cols_p1, cols_p2));
+    let num_cols_p1 = parent_1[0].weights.shape().1;
+    let num_cols_p2 = parent_2[0].weights.shape().1;
+    let mut num_cols = rng.gen_range(min(num_cols_p1, num_cols_p2)..=max(num_cols_p1, num_cols_p2));
     for (layer_p1, layer_p2) in parent_1.iter().zip(parent_2) {
-        // weights
-        let (rows_p1, cols_p1) = layer_p1.weights.shape();
-        let (rows_p2, cols_p2) = layer_p2.weights.shape();
-        let rows = rng.gen_range(min(rows_p1, rows_p2)..=max(rows_p1, rows_p2));
-        let mut weights = T::zeros((rows, cols));
-        for ((row, col), component) in weights.indexed_iter_mut() {
-            // both parents have a component at row|col
-            if row < rows_p1 && col < cols_p1 && row < rows_p2 && col < cols_p2 {
-                let weight_p1 = layer_p1.weights[[row, col]];
-                let weight_p2 = layer_p2.weights[[row, col]];
-                *component = *[weight_p1, weight_p2].choose(&mut rng).unwrap();
-            }
-            // only parent_1 has a component at row|col
-            else if row < rows_p1 && col < cols_p1 {
-                *component = layer_p1.weights[[row, col]];
-            }
-            // only parent_2 has a component at row|col
-            else if row < rows_p2 && col < cols_p2 {
-                *component = layer_p2.weights[[row, col]];
-            }
-            // neither has a component at row|col
-            else {
-                // TODO: maybe initialize new component
-            }
-        }
-        // biases
-        let mut biases = T::zeros((rows, 1));
-        for ((row, _), component) in biases.indexed_iter_mut() {
-            // both parents have a component at row
-            if rows_p1 > row && rows_p2 > row {
-                let bias_p1 = layer_p1.biases[[row, 0]];
-                let bias_p2 = layer_p2.biases[[row, 0]];
-                *component = *[bias_p1, bias_p2].choose(&mut rng).unwrap();
-            }
-            // only parent_1 has a component at row
-            else if rows_p1 > row {
-                *component = layer_p1.biases[[row, 0]];
-            }
-            // only parent_2 has a component at row
-            else {
-                *component = layer_p2.biases[[row, 0]];
-            }
-        }
-        // activation
+        let num_rows_p1 = layer_p1.size();
+        let num_rows_p2 = layer_p2.size();
+        let num_rows = rng.gen_range(min(num_rows_p1, num_rows_p2)..=max(num_rows_p1, num_rows_p2));
+        let mut weights = T::zeros((num_rows, num_cols));
+        let mut biases = T::zeros((num_rows, 1));
+        crossover_layer_weights(&mut weights, &layer_p1.weights, &layer_p2.weights, &mut rng);
+        crossover_layer_biases(&mut biases, &layer_p1.biases, &layer_p2.biases, &mut rng);
         let activation = (*[&layer_p1.activation, &layer_p2.activation].choose(&mut rng).unwrap()).clone();
-
         layers.push(Layer::new(weights, biases, activation));
-        cols = rows;
+        num_cols = num_rows;
     }
     Individual::new(layers, parent_1.get_cost_function().clone())
 }
