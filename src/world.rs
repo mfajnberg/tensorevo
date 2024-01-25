@@ -7,20 +7,18 @@ use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, thread_rng};
 
+use crate::component::TensorComponent;
 use crate::individual::Individual;
 use crate::layer::Layer;
 use crate::tensor::Tensor;
 
 
-type SelectFunc<T> = fn(&mut Population<T>, &str) -> Vec<(usize, usize)>;
+type SelectFunc<T> = fn(&mut World<T>, &str) -> Vec<(usize, usize)>;
 type ProcreateFunc<T> = fn(&Individual<T>, &Individual<T>) -> Individual<T>;
 type DetermineSpeciesKey<T> = fn(&Individual<T>) -> String;
 
 
-// TODO: The term "population" refers to a group of organisms of the **same** species.
-//       We should find a better term.
-//       It seems the term "community" or even "environment" might be suitable.
-pub struct Population<T: Tensor> {
+pub struct World<T: Tensor> {
     pub species: HashMap<String, Vec<Individual<T>>>,
     kill_weak_and_select_parents: SelectFunc<T>,
     procreate_pair: ProcreateFunc<T>, // crossover, mutation
@@ -29,7 +27,7 @@ pub struct Population<T: Tensor> {
 }
 
 
-impl<T: Tensor> Population<T> {
+impl<T: Tensor> World<T> {
     pub fn new(
         kill_weak_and_select_parents: SelectFunc<T>,
         procreate_pair: ProcreateFunc<T>,
@@ -77,15 +75,15 @@ impl<T: Tensor> Population<T> {
 /// and returns their indices as 2-tuples.
 ///
 /// # Arguments:
-/// `population`  - The population containing the species select from.
+/// `world` - The world containing the species to select from.
 /// `species_key` - The key of the species to select from.
 ///
 /// # Returns:
 /// Vector of 2-tuples of indices of the individuals in the specified species that should procreate.
-pub fn select<T: Tensor>(population: &mut Population<T>, species_key: &str) -> Vec<(usize, usize)> {
+pub fn select<T: Tensor>(world: &mut World<T>, species_key: &str) -> Vec<(usize, usize)> {
     // Sort individuals in species by validation error.
-    let individuals = population.species.get_mut(species_key).unwrap();
-    let (input, desired_output) = &population.validation_data;
+    let individuals = world.species.get_mut(species_key).unwrap();
+    let (input, desired_output) = &world.validation_data;
     individuals.sort_by_cached_key(
         |individual| OrderedFloat(individual.calculate_error(input, desired_output))
     );
@@ -105,6 +103,14 @@ pub fn select<T: Tensor>(population: &mut Population<T>, species_key: &str) -> V
        .collect()
 }
 
+
+fn init_weight<C: TensorComponent>(rng: &mut ThreadRng) -> Option<C> {
+    if *[true, false].choose(rng).unwrap() {
+        Some(C::zero())
+    } else {
+        C::from_f32(rng.gen_range(0f32..1f32))
+    }
+}
 
 
 fn crossover_layer_weights<T: Tensor>(
@@ -132,7 +138,7 @@ fn crossover_layer_weights<T: Tensor>(
         }
         // neither has a component at row|col
         else {
-            // TODO: maybe initialize new component
+            *component = init_weight(rng).unwrap()
         }
     }
 }
@@ -165,7 +171,6 @@ fn crossover_layer_biases<T: Tensor>(
 }
 
 
-// TODO: Factor out lots of things
 pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) -> Individual<T> {
     let num_layers = parent_1.num_layers();
     if num_layers != parent_2.num_layers() {
@@ -205,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let _pop = Population::new(
+        let _pop = World::new(
             select,
             procreate,
             get_species,

@@ -8,7 +8,7 @@ pub mod component;
 pub mod cost_function;
 pub mod individual;
 pub mod layer;
-pub mod population;
 pub mod tensor;
 pub mod utils;
+pub mod world;
 
