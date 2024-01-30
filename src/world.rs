@@ -6,6 +6,7 @@ use rand::distributions::Slice;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, thread_rng};
+use rand_distr::{Distribution, Poisson};
 
 use crate::component::TensorComponent;
 use crate::individual::Individual;
@@ -193,7 +194,32 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
         layers.push(Layer::new(weights, biases, activation));
         num_cols = num_rows;
     }
+    mutate_add_connections(&mut layers, &mut rng);
     Individual::new(layers, parent_1.get_cost_function().clone())
+}
+
+
+pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
+    let layer_sizes: Vec<usize> = layers.iter().map(|layer| layer.size()).collect();
+    let total_size = layer_sizes.iter().sum();
+    let dist = Poisson::new(1.).unwrap();
+    let num_new = dist.sample(rng) as usize;
+    let mut new_connections = Vec::with_capacity(num_new);
+    for _ in 0..num_new {
+        let mut idx_neuron = rng.gen_range(0..total_size);
+        let mut layer_start: usize;
+        for (idx_layer, size) in layer_sizes.iter().enumerate() {
+            if idx_neuron > *size {
+                idx_neuron -= size;
+            } else {
+                layer_start = idx_layer;
+                break;
+            }
+        }
+        let layer_end = 123;
+        let idx_end = 123;
+        new_connections.push((layer_start, idx_neuron, layer_end, idx_end))
+    }
 }
 
 
