@@ -200,25 +200,32 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
 
 
 pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
-    let layer_sizes: Vec<usize> = layers.iter().map(|layer| layer.size()).collect();
-    let total_size = layer_sizes.iter().sum();
+    let mut layer_and_neuron_indices = vec![];
+    for (idx, layer) in layers.iter().enumerate() {
+        let layer_indices = vec![idx; layer.size()];
+        let relative_neuron_indices: Vec::<usize> = (0..layer.size()).collect();
+        let combined: Vec::<(usize, usize)> = layer_indices.into_iter().zip(relative_neuron_indices).collect();
+        layer_and_neuron_indices.push(combined);
+    }
+    let neuron_index_lookup: Vec::<(usize, usize)> = layer_and_neuron_indices.into_iter().flatten().collect(); 
+    let total_size = neuron_index_lookup.len();
     let dist = Poisson::new(1.).unwrap();
     let num_new = dist.sample(rng) as usize;
     let mut new_connections = Vec::with_capacity(num_new);
     for _ in 0..num_new {
-        let mut idx_neuron = rng.gen_range(0..total_size);
-        let mut layer_start: usize;
-        for (idx_layer, size) in layer_sizes.iter().enumerate() {
-            if idx_neuron > *size {
-                idx_neuron -= size;
-            } else {
-                layer_start = idx_layer;
-                break;
-            }
-        }
-        let layer_end = 123;
-        let idx_end = 123;
-        new_connections.push((layer_start, idx_neuron, layer_end, idx_end))
+        let absolute_idx = rng.gen_range(0..total_size);
+        let (start_layer_idx, start_neuron_idx) = neuron_index_lookup[absolute_idx];
+        //
+        // Abs.idx,rel.idx,layer-start-idx
+        //
+        // x_0,0,0  x_1,1,0  x_2,2,0
+        // x_3,0,3  x_4,1,3
+        // x_5,0,5  x_6,1,5  x_7,2,5  x_8,3,5
+        //
+        //
+        // let layer_end = 123;
+        // let idx_end = 123;
+        // new_connections.push((layer_start, idx_neuron, layer_end, idx_end))
     }
 }
 
