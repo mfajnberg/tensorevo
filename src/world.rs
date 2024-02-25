@@ -1,8 +1,9 @@
 use std::cmp::{min, max};
 use std::collections::HashMap;
 
+use num_traits::{One, Zero};
 use ordered_float::OrderedFloat;
-use rand::distributions::Slice;
+use rand::distributions::{Slice, WeightedIndex};
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, thread_rng};
@@ -105,8 +106,8 @@ pub fn select<T: Tensor>(world: &mut World<T>, species_key: &str) -> Vec<(usize,
 }
 
 
-fn init_weight<C: TensorComponent>(rng: &mut ThreadRng) -> Option<C> {
-    if *[true, false].choose(rng).unwrap() {
+fn init_weight<C: TensorComponent>(rng: &mut ThreadRng, can_zero: bool) -> Option<C> {
+    if can_zero && *[true, false].choose(rng).unwrap() {
         Some(C::zero())
     } else {
         C::from_f32(rng.gen_range(0f32..1f32))
@@ -139,7 +140,7 @@ fn crossover_layer_weights<T: Tensor>(
         }
         // neither has a component at row|col
         else {
-            *component = init_weight(rng).unwrap()
+            *component = init_weight(rng, true).unwrap()
         }
     }
 }
@@ -214,18 +215,42 @@ pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut T
     let mut new_connections = Vec::with_capacity(num_new);
     for _ in 0..num_new {
         let absolute_idx = rng.gen_range(0..total_size);
-        let (start_layer_idx, start_neuron_idx) = neuron_index_lookup[absolute_idx];
-        //
-        // Abs.idx,rel.idx,layer-start-idx
-        //
-        // x_0,0,0  x_1,1,0  x_2,2,0
-        // x_3,0,3  x_4,1,3
-        // x_5,0,5  x_6,1,5  x_7,2,5  x_8,3,5
-        //
-        //
-        // let layer_end = 123;
-        // let idx_end = 123;
-        // new_connections.push((layer_start, idx_neuron, layer_end, idx_end))
+        let (mut start_layer_idx, mut start_neuron_idx) = neuron_index_lookup[absolute_idx];
+        let mut distribution_weights: Vec<f32> = layers.iter().map(|layer| layer.size() as f32).collect();
+        for index in 0..distribution_weights.len() {
+            let distance = index as isize - start_layer_idx as isize; // cast could theoretically lead to wraparound if there is an absurd amount of layers
+            distribution_weights[index] *= if distance == 0 { 0. } else { 2f32.powi((1-distance.abs()) as i32) };
+        }
+        let dist = WeightedIndex::new(&distribution_weights).unwrap();
+        let mut end_layer_idx = dist.sample(rng);
+        let mut end_neuron_idx = rng.gen_range(0..layers[end_layer_idx].size());
+        if end_layer_idx < start_layer_idx {
+            (end_layer_idx, end_neuron_idx, start_layer_idx, start_neuron_idx) = (start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx);
+        }
+        new_connections.push((start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx));
+    }
+    for (start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx) in new_connections {
+        let mut prev_neuron_idx = start_neuron_idx;
+        for layer_idx in (start_layer_idx + 1)..end_layer_idx {
+            // Append a row to weight matrix of intermediate layer.
+            // The row is all zeros except for the column corresponding to the neuron connected to
+            // it from the previous layer.
+            let weights = &mut layers[layer_idx].weights;
+            let mut new_row = vec![T::Component::zero(); weights.shape().1];
+            new_row[prev_neuron_idx] = T::Component::one();
+            weights.append_row(new_row.as_slice());
+
+            // Remember the index of the new neuron for the next iteration.
+            prev_neuron_idx = weights.shape().0 - 1;
+
+            // Append a zero to the bias vector.
+            layers[layer_idx].biases.append_row(vec![T::Component::zero()].as_slice());
+
+            // Append a column to the next layer's weight matrix with all zeros.
+            let weights = &mut layers[layer_idx + 1].weights;
+            weights.append_column(vec![T::Component::zero(); weights.shape().0].as_slice());
+        }
+        layers[end_layer_idx].weights[[end_neuron_idx, prev_neuron_idx]] = init_weight(rng, false).unwrap();
     }
 }
 

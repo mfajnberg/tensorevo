@@ -3,7 +3,7 @@
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use ndarray::{Array2, Axis};
+use ndarray::{Array2, Axis, ArrayView};
 use num_traits::FromPrimitive;
 use num_traits::real::Real;
 use serde::Serialize;
@@ -39,6 +39,12 @@ pub trait TensorBase:
     
     /// Returns the transpose of itself as a new tensor.
     fn transpose(&self) -> Self;
+
+    /// Append a row to the tensor.
+    fn append_row(&mut self, row: &[Self::Component]);
+
+    /// Append a column to the tensor.
+    fn append_column(&mut self, column: &[Self::Component]);
 
     /// Calls function `f` on each component and returns the result as a new tensor.
     fn map<F>(&self, f: F) -> Self
@@ -174,6 +180,14 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
 
     fn transpose(&self) -> Self {
         self.t().to_owned()
+    }
+
+    fn append_row(&mut self, row: &[Self::Component]) {
+        self.push_row(ArrayView::from(row)).unwrap()
+    }
+
+    fn append_column(&mut self, column: &[Self::Component]) {
+        self.push_column(ArrayView::from(column)).unwrap()
     }
 
     fn map<F>(&self, f: F) -> Self
