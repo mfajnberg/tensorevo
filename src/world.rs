@@ -201,21 +201,24 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
 
 
 pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
-    let mut layer_and_neuron_indices = vec![];
-    for (idx, layer) in layers.iter().enumerate() {
-        let layer_indices = vec![idx; layer.size()];
-        let relative_neuron_indices: Vec::<usize> = (0..layer.size()).collect();
-        let combined: Vec::<(usize, usize)> = layer_indices.into_iter().zip(relative_neuron_indices).collect();
-        layer_and_neuron_indices.push(combined);
+    // Map "global" neuron index to 2-tuple of layer index and "in-layer" neuron index.
+    let mut neuron_index_lookup = vec![];
+    for (layer_idx, layer) in layers.iter().enumerate() {
+        for neuron_idx in 0..layer.size() {
+            neuron_index_lookup.push((layer_idx, neuron_idx))
+        }
     }
-    let neuron_index_lookup: Vec::<(usize, usize)> = layer_and_neuron_indices.into_iter().flatten().collect(); 
-    let total_size = neuron_index_lookup.len();
+
+    // Decide how many new connections to create.
     let dist = Poisson::new(1.).unwrap();
-    let num_new = dist.sample(rng) as usize;
-    let mut new_connections = Vec::with_capacity(num_new);
-    for _ in 0..num_new {
-        let absolute_idx = rng.gen_range(0..total_size);
-        let (mut start_layer_idx, mut start_neuron_idx) = neuron_index_lookup[absolute_idx];
+    let num_new_connections = dist.sample(rng) as usize;
+    let mut new_connections = Vec::with_capacity(num_new_connections);
+
+    // Choose start and end for every new connection.
+    let total_size = neuron_index_lookup.len();
+    for _ in 0..num_new_connections {
+        let global_idx = rng.gen_range(0..total_size);
+        let (mut start_layer_idx, mut start_neuron_idx) = neuron_index_lookup[global_idx];
         let mut distribution_weights: Vec<f32> = layers.iter().map(|layer| layer.size() as f32).collect();
         for index in 0..distribution_weights.len() {
             let distance = index as isize - start_layer_idx as isize; // cast could theoretically lead to wraparound if there is an absurd amount of layers
@@ -229,6 +232,8 @@ pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut T
         }
         new_connections.push((start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx));
     }
+
+    // Create new connections and possibly neurons in between.
     for (start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx) in new_connections {
         let mut prev_neuron_idx = start_neuron_idx;
         for layer_idx in (start_layer_idx + 1)..end_layer_idx {
