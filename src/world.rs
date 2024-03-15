@@ -195,12 +195,62 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
         layers.push(Layer::new(weights, biases, activation));
         num_cols = num_rows;
     }
+    mutate_add_layer(&mut layers, &mut rng);
     mutate_add_connections(&mut layers, &mut rng);
     Individual::new(layers, parent_1.get_cost_function().clone())
 }
 
 
-/// Returns a vector that maps "global" neuron index to 2-tuple of layer index and "in-layer" neuron index.
+pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
+    if !should_add_layer(layers.len(), rng) {
+        return;
+    }
+    let new_layer_idx = rng.gen_range(1..=layers.len());
+    let following_layer = &layers[new_layer_idx];
+    // columns in new layer's weight matrix = neurons in previous layers
+    // = columns in weight matrix of following layer BEFORE mutation
+    let (following_weights_num_rows, following_weights_num_cols) = following_layer.weights.shape();
+    // Next layer weight matrix BEFORE mutation:
+    // 1  0
+    // 2  3
+    // 0  4
+    // New layer weight matrix:
+    // 1  0    (1)
+    // 1  0    (2)
+    // 0  1    (3)
+    // 0  1    (4)
+    // Next layer weight matrix AFTER mutation:
+    // 1  0  0  0
+    // 0  2  3  0
+    // 0  0  0  4
+
+    // rows in new layer's weight matrix = neurons = connections between
+    // = non-zero entries in weight matrix of following layer BEFORE mutation
+    let zero_component = T::Component::zero();
+    let mut new_weights_vec = Vec::<Vec<T::Component>>::new();
+    for ((_row_idx, col_idx), weight) in following_layer.weights.indexed_iter() {
+        if *weight == zero_component { continue; }
+        // All components in a row must be zero, except the one with the same column index as the
+        // non-zero component in the weight matrix of the next layer, which should be one.
+        let mut new_row = vec![zero_component; following_weights_num_cols];
+        new_row[col_idx] = T::Component::one();
+        new_weights_vec.push(new_row);
+    }
+    let following_weights_num_cols = new_weights_vec.len();
+    let new_weights = T::from_iter(new_weights_vec);
+    // Construct modified weight matrix for the next layer.
+    let mut following_weights_vec = Vec::<Vec<T::Component>>::with_capacity(following_weights_num_rows);
+    // ...
+}
+
+
+fn should_add_layer(num_layers: usize, rng: &mut ThreadRng) -> bool {
+    let threshold = 1.0/2.0_f32.powi((num_layers - 1) as i32);
+    rng.gen_range(0.0..1.0) < threshold
+}
+
+
+/// Randomly adds new connections between existing neurons.
 pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
     let neuron_index_lookup = get_neuron_index_lookup(layers);
     let total_size = neuron_index_lookup.len();
@@ -211,6 +261,7 @@ pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut T
 }
 
 
+/// Returns a vector that maps "global" neuron index to 2-tuple of layer index and "in-layer" neuron index.
 fn get_neuron_index_lookup<T: Tensor>(layers: &Vec<Layer<T>>) -> Vec<(usize, usize)> {
     let size = layers.iter().map(|layer| layer.size()).sum();
     let mut neuron_index_lookup = Vec::with_capacity(size);

@@ -30,6 +30,11 @@ pub trait TensorBase:
     
     /// Creates a tensor of the specified `shape` with all components equal to `num`.
     fn from_num(num: Self::Component, shape: (usize, usize)) -> Self;
+
+    fn from_iter<I, J>(iterator: I) -> Self
+    where
+        I: IntoIterator<Item = J>,
+        J: IntoIterator<Item = Self::Component>;
     
     /// Returns the shape of the tensor as a tuple of unsigned integers.
     fn shape(&self) -> (usize, usize);
@@ -54,7 +59,11 @@ pub trait TensorBase:
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
     
+    fn indexed_iter(&self) -> impl Iterator<Item = ((usize, usize), &Self::Component)>;
+
     fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ((usize, usize), &mut Self::Component)>;
+
+    fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
     /// Returns the sum of all rows (0) or columns (1) as a new tensor.
     fn sum_axis(&self, axis: usize) -> Self;
@@ -166,6 +175,31 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     fn from_num(num: Self::Component, shape: (usize, usize)) -> Self {
         Self::from_elem(shape, num)
     }
+
+    fn from_iter<I, J>(iterator: I) -> Self
+    where
+        I: IntoIterator<Item = J>,
+        J: IntoIterator<Item = Self::Component>,
+    {
+        let mut data = Vec::new();
+        let mut num_rows: usize = 0;
+        let mut num_columns: Option<usize> = None;
+        for row in iterator {
+            num_rows += 1;
+            let row_vec: Vec<Self::Component> = row.into_iter().collect();
+            match num_columns {
+                Some(n) => {
+                    if n != row_vec.len() { panic!() }
+                },
+                None => num_columns = Some(row_vec.len()),
+            }
+            data.extend_from_slice(&row_vec);
+        }
+        Array2::from_shape_vec(
+            (num_rows, num_columns.unwrap_or(0)),
+            data,
+        ).unwrap()
+    }
     
     fn shape(&self) -> (usize, usize) {
         self.dim()
@@ -200,8 +234,16 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
         self.mapv_inplace(f)
     }
 
+    fn indexed_iter(&self) -> impl Iterator<Item = ((usize, usize), &Self::Component)> {
+        Array2::<C>::indexed_iter(self)
+    }
+
     fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ((usize, usize), &mut Self::Component)> {
         Array2::<C>::indexed_iter_mut(self)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Self::Component> {
+        Array2::<C>::iter(self)
     }
 
     fn sum_axis(&self, axis: usize) -> Self {
