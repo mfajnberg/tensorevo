@@ -44,7 +44,7 @@ impl<T: Tensor> World<T> {
             validation_data,
         }
     }
-    
+
     // mutates sets of individuals within one species
     pub fn apply_selection(&mut self, species_key: String) {
         let pairs = (self.kill_weak_and_select_parents)(self, &species_key);
@@ -202,11 +202,10 @@ pub fn procreate<T: Tensor>(parent_1: &Individual<T>, parent_2: &Individual<T>) 
 
 
 pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
-    if !should_add_layer(layers.len(), rng) {
-        return;
-    }
+    if !should_add_layer(layers.len(), rng) { return; }
+
     let new_layer_idx = rng.gen_range(1..=layers.len());
-    let following_layer = &layers[new_layer_idx];
+    let following_layer = &mut layers[new_layer_idx];
     // columns in new layer's weight matrix = neurons in previous layers
     // = columns in weight matrix of following layer BEFORE mutation
     let (following_weights_num_rows, following_weights_num_cols) = following_layer.weights.shape();
@@ -227,20 +226,31 @@ pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadR
     // rows in new layer's weight matrix = neurons = connections between
     // = non-zero entries in weight matrix of following layer BEFORE mutation
     let zero_component = T::Component::zero();
-    let mut new_weights_vec = Vec::<Vec<T::Component>>::new();
-    for ((_row_idx, col_idx), weight) in following_layer.weights.indexed_iter() {
-        if *weight == zero_component { continue; }
-        // All components in a row must be zero, except the one with the same column index as the
-        // non-zero component in the weight matrix of the next layer, which should be one.
-        let mut new_row = vec![zero_component; following_weights_num_cols];
-        new_row[col_idx] = T::Component::one();
-        new_weights_vec.push(new_row);
-    }
-    let following_weights_num_cols = new_weights_vec.len();
-    let new_weights = T::from_iter(new_weights_vec);
-    // Construct modified weight matrix for the next layer.
-    let mut following_weights_vec = Vec::<Vec<T::Component>>::with_capacity(following_weights_num_rows);
-    // ...
+    let new_weights_num_rows = following_layer.weights.iter().filter(|&weight| *weight != zero_component).count();
+    let mut new_weights = T::zeros((new_weights_num_rows, following_weights_num_cols));
+    let mut row_idx = 0;
+    following_layer.weights.indexed_iter().for_each(
+        |((_, col_idx), weight)| if *weight != zero_component {
+            new_weights[[row_idx, col_idx]] = T::Component::one();
+            row_idx += 1;
+        }
+    );
+    let new_biases = T::zeros((new_weights_num_rows, 1));
+    let new_layer = Layer::new(new_weights, new_biases, following_layer.activation.clone());
+
+    // modified following weight matrix:
+    // rows unchanged, columns = rows in new layer's weight matrix
+    let mut following_weights = T::zeros((following_weights_num_rows, new_weights_num_rows));
+    let mut col_idx = 0;
+    following_layer.weights.indexed_iter().for_each(
+        |((row_idx, _), weight)| if *weight != zero_component {
+            following_weights[[row_idx, col_idx]] = *weight;
+            col_idx += 1;
+        }
+    );
+    following_layer.weights = following_weights;
+
+    layers.insert(new_layer_idx, new_layer);
 }
 
 
