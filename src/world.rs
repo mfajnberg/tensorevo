@@ -228,28 +228,20 @@ pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadR
     let zero_component = T::Component::zero();
     let new_weights_num_rows = following_layer.weights.iter().filter(|&weight| *weight != zero_component).count();
     let mut new_weights = T::zeros((new_weights_num_rows, following_weights_num_cols));
-    let mut row_idx = 0;
-    following_layer.weights.indexed_iter().for_each(
-        |((_, col_idx), weight)| if *weight != zero_component {
-            new_weights[[row_idx, col_idx]] = T::Component::one();
-            row_idx += 1;
-        }
-    );
-    let new_biases = T::zeros((new_weights_num_rows, 1));
-    let new_layer = Layer::new(new_weights, new_biases, following_layer.activation.clone());
-
     // modified following weight matrix:
     // rows unchanged, columns = rows in new layer's weight matrix
     let mut following_weights = T::zeros((following_weights_num_rows, new_weights_num_rows));
-    let mut col_idx = 0;
+    let mut connection_idx = 0;
     following_layer.weights.indexed_iter().for_each(
-        |((row_idx, _), weight)| if *weight != zero_component {
-            following_weights[[row_idx, col_idx]] = *weight;
-            col_idx += 1;
+        |((row_idx, col_idx), weight)| if *weight != zero_component {
+            new_weights[[connection_idx, col_idx]] = T::Component::one();
+            following_weights[[row_idx, connection_idx]] = *weight;
+            connection_idx += 1;
         }
     );
     following_layer.weights = following_weights;
-
+    let new_biases = T::zeros((new_weights_num_rows, 1));
+    let new_layer = Layer::new(new_weights, new_biases, following_layer.activation.clone());
     layers.insert(new_layer_idx, new_layer);
 }
 
