@@ -61,7 +61,7 @@ fn should_add_layer(num_layers: usize, rng: &mut ThreadRng) -> bool {
 
 
 /// Randomly adds new connections between existing neurons.
-pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
+pub fn mutate_add_connections<T: Tensor>(layers: &mut [Layer<T>], rng: &mut ThreadRng) {
     let neuron_index_lookup = get_neuron_index_lookup(layers);
     let total_size = neuron_index_lookup.len();
     // Decide how many new connections to create.
@@ -72,7 +72,7 @@ pub fn mutate_add_connections<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut T
 
 
 /// Returns a vector that maps "global" neuron index to 2-tuple of layer index and "in-layer" neuron index.
-fn get_neuron_index_lookup<T: Tensor>(layers: &Vec<Layer<T>>) -> Vec<(usize, usize)> {
+fn get_neuron_index_lookup<T: Tensor>(layers: &[Layer<T>]) -> Vec<(usize, usize)> {
     let size = layers.iter().map(|layer| layer.size()).sum();
     let mut neuron_index_lookup = Vec::with_capacity(size);
     for (layer_idx, layer) in layers.iter().enumerate() {
@@ -86,17 +86,17 @@ fn get_neuron_index_lookup<T: Tensor>(layers: &Vec<Layer<T>>) -> Vec<(usize, usi
 
 /// Randomly chooses a start and end of a new connection.
 fn choose_new_connection<T: Tensor>(
-    layers: &Vec<Layer<T>>,
+    layers: &[Layer<T>],
     total_size: usize,
-    neuron_index_lookup: &Vec<(usize, usize)>,
+    neuron_index_lookup: &[(usize, usize)],
     rng: &mut ThreadRng,
 ) -> (usize, usize, usize, usize) {
     let global_idx = rng.gen_range(0..total_size);
     let (mut start_layer_idx, mut start_neuron_idx) = neuron_index_lookup[global_idx];
     let mut distribution_weights: Vec<f32> = layers.iter().map(|layer| layer.size() as f32).collect();
-    for index in 0..distribution_weights.len() {
-        let distance = index as isize - start_layer_idx as isize; // cast could theoretically lead to wraparound if there is an absurd amount of layers
-        distribution_weights[index] *= if distance == 0 { 0. } else { 2f32.powi((1-distance.abs()) as i32) };
+    for (layer_idx, layer_weight) in distribution_weights.iter_mut().enumerate() {
+        let distance = layer_idx as isize - start_layer_idx as isize; // cast could theoretically lead to wraparound if there is an absurd amount of layers
+        *layer_weight *= if distance == 0 { 0. } else { 2f32.powi((1-distance.abs()) as i32) };
     }
     let dist = WeightedIndex::new(&distribution_weights).unwrap();
     let mut end_layer_idx = dist.sample(rng);
@@ -110,9 +110,9 @@ fn choose_new_connection<T: Tensor>(
 
 /// Creates new connections and possibly neurons in between.
 fn add_new_connection<T: Tensor>(
-    layers: &mut Vec<Layer<T>>,
+    layers: &mut [Layer<T>],
     total_size: usize,
-    neuron_index_lookup: &Vec<(usize, usize)>,
+    neuron_index_lookup: &[(usize, usize)],
     rng: &mut ThreadRng,
 ) {
     let (start_layer_idx, start_neuron_idx, end_layer_idx, end_neuron_idx) = choose_new_connection(layers, total_size, neuron_index_lookup, rng);

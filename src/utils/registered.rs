@@ -97,9 +97,7 @@ where
     /// # Arguments
     /// - `registry_lock` - Associated registry singleton wrapped in a borrowed [`RwLock`].
     #[allow(unused_variables)]
-    fn registry_post_init(registry_lock: &RwLock<Self::Registry>) {
-        ()
-    }
+    fn registry_post_init(registry_lock: &RwLock<Self::Registry>) {}
 
     /// Returns a reference to the associated registry singleton.
     ///
@@ -151,7 +149,7 @@ where
         let registry_lock = Self::get_registry();
         registry_lock.read().unwrap()
                      .get_ref(&key.into())
-                     .and_then(|instance| Some(instance.clone()))
+                     .cloned()
     }
 
     /// Convenience method for implementing [`serde::Serialize`] for types that implement

@@ -293,36 +293,34 @@ impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
 /// use tensorevo::individual::Individual;
 /// use tensorevo::layer::Layer;
 ///
-/// fn main() {
-///     // Simply doubles the input and subtracts 1 in the first component.
-///     let individual = Individual::new(
-///         vec![
-///             Layer {
-///                 weights: array![
-///                     [2., 0.],
-///                     [0., 2.],
-///                 ],
-///                 biases: array![
-///                     [-1.],
-///                     [ 0.],
-///                 ],
-///                 activation: Activation::get("identity").unwrap(),
-///             },
-///         ],
-///         CostFunction::default(),
-///     );
+/// // Simply doubles the input and subtracts 1 in the first component.
+/// let individual = Individual::new(
+///     vec![
+///         Layer {
+///             weights: array![
+///                 [2., 0.],
+///                 [0., 2.],
+///             ],
+///             biases: array![
+///                 [-1.],
+///                 [ 0.],
+///             ],
+///             activation: Activation::get("identity").unwrap(),
+///         },
+///     ],
+///     CostFunction::default(),
+/// );
 ///
-///     let input = array![
-///         [ 2.],
-///         [-2.],
-///     ];
-///     let expected_output = array![
-///         [ 3.],
-///         [-4.],
-///     ];
-///     let output = individual(&input);
-///     assert_eq!(output, expected_output);
-/// }
+/// let input = array![
+///     [ 2.],
+///     [-2.],
+/// ];
+/// let expected_output = array![
+///     [ 3.],
+///     [-4.],
+/// ];
+/// let output = individual(&input);
+/// assert_eq!(output, expected_output);
 /// ```
 impl<T: Tensor> Fn<(&T,)> for Individual<T> {
     /// Performs a full forward pass for a given input and returns the network's output.

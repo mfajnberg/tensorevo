@@ -165,19 +165,17 @@ impl<'de, T: 'static + TensorOp> Deserialize<'de> for CostFunction<T> {
 /// use tensorevo::tensor::TensorOp;
 ///
 ///
-/// fn main() {
-///     type T = Array2::<f32>;
+/// type T = Array2::<f32>;
 ///
-///     // No cost function with the name `foo` was registered:
-///     assert_eq!(CostFunction::<T>::get("foo"), None);
+/// // No cost function with the name `foo` was registered:
+/// assert_eq!(CostFunction::<T>::get("foo"), None);
 ///
-///     // Common cost functions are available by default:
-///     let quadratic = CostFunction::<T>::get("quadratic").unwrap();
-///     let x = array![[1., 2.]];
-///     let y = array![[1., 0.]];
-///     assert_eq!(quadratic(&x, &y), 1.);
-///     assert_eq!(quadratic.d(&x, &y), array![[0., 2.]]);
-/// }
+/// // Common cost functions are available by default:
+/// let quadratic = CostFunction::<T>::get("quadratic").unwrap();
+/// let x = array![[1., 2.]];
+/// let y = array![[1., 0.]];
+/// assert_eq!(quadratic(&x, &y), 1.);
+/// assert_eq!(quadratic.d(&x, &y), array![[0., 2.]]);
 /// ```
 impl<T: 'static + TensorOp> Registered<String> for CostFunction<T> {
     /// Returns a reference to the name provided in the [`CostFunction::new`] constructor.
