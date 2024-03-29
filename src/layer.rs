@@ -25,6 +25,10 @@ impl<T: Tensor> Layer<T> {
         let activation = (self.activation)(&weighted_input);
         (weighted_input, activation)
     }
+
+    pub fn size(&self) -> usize {
+        self.weights.shape().0
+    }
 }
 
 
