@@ -93,11 +93,12 @@ fn choose_new_connection<T: Tensor>(
 ) -> (usize, usize, usize, usize) {
     let global_idx = rng.gen_range(0..total_size);
     let (mut start_layer_idx, mut start_neuron_idx) = neuron_index_lookup[global_idx];
-    let mut distribution_weights: Vec<f32> = layers.iter().map(|layer| layer.size() as f32).collect();
-    for (layer_idx, layer_weight) in distribution_weights.iter_mut().enumerate() {
-        let distance = layer_idx as isize - start_layer_idx as isize; // cast could theoretically lead to wraparound if there is an absurd amount of layers
-        *layer_weight *= if distance == 0 { 0. } else { 2f32.powi((1-distance.abs()) as i32) };
-    }
+    let distribution_weights: Vec<f32> = layers.iter().enumerate().map(
+        |(layer_idx, layer)| {
+            let distance = (layer_idx as isize - start_layer_idx as isize).abs() as i32; // cast could theoretically lead to wraparound if there is an absurd amount of layers
+            if distance == 0 { 0. } else { layer.size() as f32 / 2f32.powi(distance - 1) }
+        }
+    ).collect();
     let dist = WeightedIndex::new(&distribution_weights).unwrap();
     let mut end_layer_idx = dist.sample(rng);
     let mut end_neuron_idx = rng.gen_range(0..layers[end_layer_idx].size());
