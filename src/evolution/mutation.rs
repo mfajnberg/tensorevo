@@ -16,7 +16,7 @@ pub fn mutate_add_layer<T: Tensor2>(layers: &mut Vec<Layer<T>>, rng: &mut Thread
     let following_layer = &mut layers[new_layer_idx];
     // columns in new layer's weight matrix = neurons in previous layers
     // = columns in weight matrix of following layer BEFORE mutation
-    let (following_weights_num_rows, following_weights_num_cols) = following_layer.weights.shape().into();
+    let (following_weights_num_rows, following_weights_num_cols) = following_layer.weights.shape();
     // Next layer weight matrix BEFORE mutation:
     // 1  0
     // 2  3
@@ -124,16 +124,18 @@ fn add_new_connection<T: Tensor2>(
         // The row is all zeros except for the column corresponding to the neuron connected to
         // it from the previous layer.
         let weights = &mut layers[layer_idx].weights;
-        let mut new_row = vec![T::Component::zero(); weights.shape()[1]];
+        let (num_rows, num_cols) = weights.shape();
+        let mut new_row = vec![T::Component::zero(); num_cols];
         new_row[prev_neuron_idx] = T::Component::one();
         weights.append_row(new_row.as_slice());
         // Remember the index of the new neuron for the next iteration.
-        prev_neuron_idx = weights.shape()[0] - 1;
+        prev_neuron_idx = num_rows;
         // Append a zero to the bias vector.
         layers[layer_idx].biases.append_row(vec![T::Component::zero()].as_slice());
         // Append a column to the next layer's weight matrix with all zeros.
         let weights = &mut layers[layer_idx + 1].weights;
-        weights.append_column(vec![T::Component::zero(); weights.shape()[0]].as_slice());
+        let (num_rows, _) = weights.shape();
+        weights.append_column(vec![T::Component::zero(); num_rows].as_slice());
     }
     layers[end_layer_idx].weights[[end_neuron_idx, prev_neuron_idx]] = init_weight(rng, false).unwrap();
 }

@@ -11,8 +11,8 @@ pub fn crossover_layer_weights<T: Tensor2>(
     weights_p2: &T,
     rng: &mut ThreadRng,
 ) {
-    let (rows_p1, cols_p1) = weights_p1.shape().into();
-    let (rows_p2, cols_p2) = weights_p2.shape().into();
+    let (rows_p1, cols_p1) = weights_p1.shape();
+    let (rows_p2, cols_p2) = weights_p2.shape();
     for (idx, component) in new_weights.indexed_iter_mut() {
         let row = idx[0];
         let col = idx[1];
@@ -44,8 +44,8 @@ pub fn crossover_layer_biases<T: Tensor2>(
     biases_p2: &T,
     rng: &mut ThreadRng,
 ) {
-    let rows_p1 = biases_p1.shape()[0];
-    let rows_p2 = biases_p2.shape()[0];
+    let (rows_p1, _) = biases_p1.shape();
+    let (rows_p2, _) = biases_p2.shape();
     for (idx, component) in new_biases.indexed_iter_mut() {
         let row = idx[0];
         // both parents have a component at row

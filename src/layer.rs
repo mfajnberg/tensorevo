@@ -29,7 +29,7 @@ impl<T: Tensor2> Layer<T> {
     }
 
     pub fn size(&self) -> usize {
-        self.weights.shape().0
+        self.weights.shape::<(usize, usize)>().0
     }
 }
 
@@ -76,7 +76,7 @@ mod tests {
     }
 
     fn twos<T: Tensor2>(t: &T) -> T {
-        let ones = T::from_num(T::Component::one(), t.shape());
+        let ones = T::from_num(T::Component::one(), t.shape::<(usize, usize)>());
         &ones + &ones
     }
 

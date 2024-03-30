@@ -24,20 +24,15 @@ pub trait TensorBase<const D: usize>:
     type Component: TensorComponent;
     
     /// Creates a tensor of the specified `shape` with all zero components.
-    fn zeros(shape: [usize; D]) -> Self {
+    fn zeros(shape: impl Into<[usize; D]>) -> Self {
         Self::from_num(Self::Component::from_usize(0).unwrap(), shape)
     }
     
     /// Creates a tensor of the specified `shape` with all components equal to `num`.
-    fn from_num(num: Self::Component, shape: [usize; D]) -> Self;
+    fn from_num(num: Self::Component, shape: impl Into<[usize; D]>) -> Self;
 
-    fn from_iter<I, J>(iterator: I) -> Self
-    where
-        I: IntoIterator<Item = J>,
-        J: IntoIterator<Item = Self::Component>;
-    
     /// Returns the shape of the tensor as a tuple of unsigned integers.
-    fn shape(&self) -> [usize; D];
+    fn shape<S: From<[usize; D]>>(&self) -> S;
     
     /// Returns a vector of vectors of the tensor's components.
     fn to_vec(&self) -> Vec<Vec<Self::Component>>;
@@ -175,37 +170,12 @@ pub trait Tensor2 = Tensor<2>;
 impl<C: TensorComponent> TensorBase<2> for Array2<C> {
     type Component = C;
 
-    fn from_num(num: Self::Component, shape: [usize; 2]) -> Self {
-        Self::from_elem(shape, num)
+    fn from_num(num: Self::Component, shape: impl Into<[usize; 2]>) -> Self {
+        Self::from_elem(shape.into(), num)
     }
 
-    fn from_iter<I, J>(iterator: I) -> Self
-    where
-        I: IntoIterator<Item = J>,
-        J: IntoIterator<Item = Self::Component>,
-    {
-        let mut data = Vec::new();
-        let mut num_rows: usize = 0;
-        let mut num_columns: Option<usize> = None;
-        for row in iterator {
-            num_rows += 1;
-            let row_vec: Vec<Self::Component> = row.into_iter().collect();
-            match num_columns {
-                Some(n) => {
-                    if n != row_vec.len() { panic!() }
-                },
-                None => num_columns = Some(row_vec.len()),
-            }
-            data.extend_from_slice(&row_vec);
-        }
-        Array2::from_shape_vec(
-            (num_rows, num_columns.unwrap_or(0)),
-            data,
-        ).unwrap()
-    }
-    
-    fn shape(&self) -> [usize; 2] {
-        self.dim().into()
+    fn shape<S: From<[usize; 2]>>(&self) -> S {
+        S::from(self.dim().into())
     }
     
     fn to_vec(&self) -> Vec<Vec<Self::Component>> {
@@ -355,7 +325,7 @@ mod tests {
                 [0., 1., 2.],
                 [3., 4., 5.]
             ];
-            let shape = TensorBase::shape(&tensor);
+            let shape: [usize; 2] = TensorBase::shape(&tensor);
             assert_eq!(shape, [2, 3]);
         }
 

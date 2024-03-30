@@ -98,7 +98,7 @@ impl<T: TensorBase<D>, const D: usize> FnMut<(&T,)> for Activation<T, D> {
 /// use tensorevo::tensor::TensorBase;
 ///
 /// fn zero_function<T: TensorBase<D>, const D: usize>(t: &T) -> T {
-///     T::zeros(t.shape())
+///     T::zeros(t.shape::<[usize; D]>())
 /// }
 ///
 /// fn main() {
@@ -159,12 +159,12 @@ impl<'de, T: 'static + TensorBase<D>, const D: usize> Deserialize<'de> for Activ
 /// use tensorevo::activation::{Activation, Registered};
 /// use tensorevo::tensor::TensorOp;
 ///
-/// fn double<T: TensorOp<D>, const D: usize>(t: &T) -> T {
+/// fn double<T: TensorOp<2>>(t: &T) -> T {
 ///     t + t
 /// }
 ///
-/// fn to_two<T: TensorOp<D>, const D: usize>(t: &T) -> T {
-///     let ones = T::from_num(T::Component::one(), t.shape());
+/// fn to_two<T: TensorOp<2>>(t: &T) -> T {
+///     let ones = T::from_num(T::Component::one(), t.shape::<[usize; 2]>());
 ///     &ones + &ones
 /// }
 ///
@@ -300,7 +300,7 @@ pub mod functions {
 
     /// Returns a tensor filled with ones with the shape of `tensor`. (Derivative of the identity.)
     pub fn to_one<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
-        T::from_num(T::Component::one(), tensor.shape())
+        T::from_num(T::Component::one(), tensor.shape::<[usize; D]>())
     }
 }
 

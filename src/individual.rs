@@ -205,9 +205,9 @@ impl<T: Tensor2> Individual<T> {
         let (nabla_weights, nabla_biases) = self.backprop(input, desired_output);
         let gradients = nabla_weights.iter().zip(&nabla_biases).rev();
         for (idx, (nw, nb)) in gradients.enumerate() {
-            let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
+            let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape::<[usize; 2]>());
             self.layers[idx].weights -= &(weights_update_factor * nw);
-            let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
+            let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape::<[usize; 2]>());
             self.layers[idx].biases -= &(biases_update_factor * nb);
         }
         if let Some((input, desired_output)) = validation_data {
@@ -230,7 +230,7 @@ impl<T: Tensor2> Individual<T> {
         learning_rate: f32,
         validation_data: Option<(&T, &T)>,
     ) {
-        let batch_size = training_data[0].0.shape()[1];
+        let (_, batch_size) = training_data[0].0.shape();
         let update_factor = T::Component::from_f32(learning_rate / batch_size as f32).unwrap();
         let num_batches = training_data.len();
         for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {

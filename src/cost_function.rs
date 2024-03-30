@@ -111,7 +111,7 @@ impl<T: TensorBase<D>, const D: usize> FnMut<(&T, &T)> for CostFunction<T, D> {
 /// }
 ///
 /// fn zero_derivative<T: TensorBase<D>, const D: usize>(t1: &T, _t2: &T) -> T {
-///     T::zeros(t1.shape())
+///     T::zeros(t1.shape::<[usize; D]>())
 /// }
 ///
 /// fn main() {

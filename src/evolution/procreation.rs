@@ -17,8 +17,8 @@ pub fn procreate<T: Tensor2>(parent_1: &Individual<T>, parent_2: &Individual<T>)
     }
     let mut layers = Vec::with_capacity(num_layers);
     let mut rng = thread_rng();
-    let num_cols_p1 = parent_1[0].weights.shape()[1];
-    let num_cols_p2 = parent_2[0].weights.shape()[1];
+    let (_, num_cols_p1) = parent_1[0].weights.shape();
+    let (_, num_cols_p2) = parent_2[0].weights.shape();
     let mut num_cols = rng.gen_range(min(num_cols_p1, num_cols_p2)..=max(num_cols_p1, num_cols_p2));
     for (layer_p1, layer_p2) in parent_1.iter().zip(parent_2) {
         let num_rows_p1 = layer_p1.size();
