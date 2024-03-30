@@ -25,7 +25,7 @@ type TFuncPrime<T> = fn(&T, &T) -> T;
 ///
 /// [`Individual`]: crate::individual::Individual
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CostFunction<T: TensorBase<D>, const D: usize> {
+pub struct CostFunction<T: TensorBase> {
     name: String,
     function: TFunc<T>,
     derivative: TFuncPrime<T>,
@@ -33,7 +33,7 @@ pub struct CostFunction<T: TensorBase<D>, const D: usize> {
 
 
 /// Methods for construction and calling.
-impl<T: TensorBase<D>, const D: usize> CostFunction<T, D> {
+impl<T: TensorBase> CostFunction<T> {
     /// Basic constructor.
     ///
     /// # Arguments
@@ -64,7 +64,7 @@ impl<T: TensorBase<D>, const D: usize> CostFunction<T, D> {
 
 
 /// Returns an instance of the quadratic cost function as the default.
-impl<T: 'static + TensorOp<D>, const D: usize> Default for CostFunction<T, D> {
+impl<T: 'static + TensorOp> Default for CostFunction<T> {
     fn default() -> Self {
         Self::get("quadratic").unwrap()
     }
@@ -74,7 +74,7 @@ impl<T: 'static + TensorOp<D>, const D: usize> Default for CostFunction<T, D> {
 /// Makes `CostFunction<T>` callable by value (i.e. consuming the instance).
 ///
 /// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
-impl<T: TensorBase<D>, const D: usize> FnOnce<(&T, &T)> for CostFunction<T, D> {
+impl<T: TensorBase> FnOnce<(&T, &T)> for CostFunction<T> {
     type Output = f32;
 
     /// Proxy for the actual underlying cost function.
@@ -87,7 +87,7 @@ impl<T: TensorBase<D>, const D: usize> FnOnce<(&T, &T)> for CostFunction<T, D> {
 /// Makes `CostFunction<T>` callable by mutable reference.
 ///
 /// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
-impl<T: TensorBase<D>, const D: usize> FnMut<(&T, &T)> for CostFunction<T, D> {
+impl<T: TensorBase> FnMut<(&T, &T)> for CostFunction<T> {
     /// Proxy for the actual underlying cost function.
     extern "rust-call" fn call_mut(&mut self, args: (&T, &T)) -> Self::Output {
         (self.function)(args.0, args.1)
@@ -106,12 +106,12 @@ impl<T: TensorBase<D>, const D: usize> FnMut<(&T, &T)> for CostFunction<T, D> {
 /// use tensorevo::cost_function::CostFunction;
 /// use tensorevo::tensor::TensorBase;
 ///
-/// fn zero_function<T: TensorBase<D>, const D: usize>(_t1: &T, _t2: &T) -> f32 {
+/// fn zero_function<T: TensorBase>(_t1: &T, _t2: &T) -> f32 {
 ///     0.
 /// }
 ///
-/// fn zero_derivative<T: TensorBase<D>, const D: usize>(t1: &T, _t2: &T) -> T {
-///     T::zeros(t1.shape::<[usize; D]>())
+/// fn zero_derivative<T: TensorBase>(t1: &T, _t2: &T) -> T {
+///     T::zeros(t1.shape::<T::Dim>())
 /// }
 ///
 /// fn main() {
@@ -125,7 +125,7 @@ impl<T: TensorBase<D>, const D: usize> FnMut<(&T, &T)> for CostFunction<T, D> {
 ///
 /// The call operator always calls the actual cost function.
 /// To call the derivative use the [`CostFunction::d`] method.
-impl<T: TensorBase<D>, const D: usize> Fn<(&T, &T)> for CostFunction<T, D> {
+impl<T: TensorBase> Fn<(&T, &T)> for CostFunction<T> {
     /// Proxy for the actual underlying cost function.
     extern "rust-call" fn call(&self, args: (&T, &T)) -> Self::Output {
         (self.function)(args.0, args.1)
@@ -134,7 +134,7 @@ impl<T: TensorBase<D>, const D: usize> Fn<(&T, &T)> for CostFunction<T, D> {
 
 
 /// Allows [`serde`] to serialize [`CostFunction`] objects.
-impl<T: 'static + TensorOp<D>, const D: usize> Serialize for CostFunction<T, D> {
+impl<T: 'static + TensorOp> Serialize for CostFunction<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         Registered::serialize_as_key(self, serializer)
     }
@@ -142,7 +142,7 @@ impl<T: 'static + TensorOp<D>, const D: usize> Serialize for CostFunction<T, D> 
 
 
 /// Allows [`serde`] to deserialize to [`CostFunction`] objects.
-impl<'de, T: 'static + TensorOp<D>, const D: usize> Deserialize<'de> for CostFunction<T, D> {
+impl<'de, T: 'static + TensorOp> Deserialize<'de> for CostFunction<T> {
     fn deserialize<DE: Deserializer<'de>>(deserializer: DE) -> Result<Self, DE::Error> {
         Registered::deserialize_from_key(deserializer)
     }
@@ -173,16 +173,16 @@ impl<'de, T: 'static + TensorOp<D>, const D: usize> Deserialize<'de> for CostFun
 /// type T = Array2::<f32>;
 ///
 /// // No cost function with the name `foo` was registered:
-/// assert_eq!(CostFunction::<T, 2>::get("foo"), None);
+/// assert_eq!(CostFunction::<T>::get("foo"), None);
 ///
 /// // Common cost functions are available by default:
-/// let quadratic = CostFunction::<T, 2>::get("quadratic").unwrap();
+/// let quadratic = CostFunction::<T>::get("quadratic").unwrap();
 /// let x = array![[1., 2.]];
 /// let y = array![[1., 0.]];
 /// assert_eq!(quadratic(&x, &y), 1.);
 /// assert_eq!(quadratic.d(&x, &y), array![[0., 2.]]);
 /// ```
-impl<T: 'static + TensorOp<D>, const D: usize> Registered<String> for CostFunction<T, D> {
+impl<T: 'static + TensorOp> Registered<String> for CostFunction<T> {
     /// Returns a reference to the name provided in the [`CostFunction::new`] constructor.
     fn key(&self) -> &String {
         &self.name
@@ -217,7 +217,7 @@ pub mod functions {
     ///
     /// # Returns
     /// The cost as 32 bit float.
-    pub fn quadratic<T: TensorOp<D>, const D: usize>(output: &T, desired_output: &T) -> f32 {
+    pub fn quadratic<T: TensorOp>(output: &T, desired_output: &T) -> f32 {
         (desired_output - output).norm().to_f32().unwrap() / 2.
     }
 
@@ -233,7 +233,7 @@ pub mod functions {
     ///
     /// # Returns
     /// Another tensor.
-    pub fn quadratic_prime<T: TensorOp<D>, const D: usize>(output: &T, desired_output: &T) -> T {
+    pub fn quadratic_prime<T: TensorOp>(output: &T, desired_output: &T) -> T {
         output - desired_output
     }
 }
@@ -249,7 +249,7 @@ mod tests {
 
         #[test]
         fn test_new() {
-            let cost_function = CostFunction::<Array2<f32>, 2>::new(
+            let cost_function = CostFunction::<Array2<f32>>::new(
                 "quadratic",
                 quadratic,
                 quadratic_prime,
@@ -280,7 +280,7 @@ mod tests {
 
         #[test]
         fn test_default() {
-            let default = CostFunction::<Array2<f32>, 2>::default();
+            let default = CostFunction::<Array2<f32>>::default();
             assert_eq!(
                 default,
                 CostFunction {

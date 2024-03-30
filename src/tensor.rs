@@ -3,17 +3,18 @@
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use ndarray::{Array2, Axis, ArrayView};
+use ndarray::{Array2, ArrayView, Axis};
 use num_traits::FromPrimitive;
 use num_traits::real::Real;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::component::TensorComponent;
+use crate::dimension::{Dimension, HasLowerDimension};
 
 
 /// Basic methods of multi-dimensional arrays ("tensors").
-pub trait TensorBase<const D: usize>:
+pub trait TensorBase:
     Clone
     + Debug
     + Display
@@ -22,23 +23,31 @@ pub trait TensorBase<const D: usize>:
 {
     /// The type of every component of the tensor.
     type Component: TensorComponent;
+
+    /// The dimensionality/index type of the tensor.
+    type Dim: Dimension + HasLowerDimension;
     
     /// Creates a tensor of the specified `shape` with all zero components.
-    fn zeros(shape: impl Into<[usize; D]>) -> Self {
+    fn zeros(shape: impl Into<Self::Dim>) -> Self {
         Self::from_num(Self::Component::from_usize(0).unwrap(), shape)
     }
     
     /// Creates a tensor of the specified `shape` with all components equal to `num`.
-    fn from_num(num: Self::Component, shape: impl Into<[usize; D]>) -> Self;
+    fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self;
 
     /// Returns the shape of the tensor as a tuple of unsigned integers.
-    fn shape<S: From<[usize; D]>>(&self) -> S;
+    fn shape<S: From<Self::Dim>>(&self) -> S;
     
     /// Returns a vector of vectors of the tensor's components.
     fn to_vec(&self) -> Vec<Vec<Self::Component>>;
     
     /// Returns the transpose of itself as a new tensor.
     fn transpose(&self) -> Self;
+
+    fn as_slice(&self) -> &[Self::Component];
+
+    fn append<T>(&mut self, axis: usize, tensor: &T)
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
     /// Append a row to the tensor.
     fn append_row(&mut self, row: &[Self::Component]);
@@ -54,9 +63,9 @@ pub trait TensorBase<const D: usize>:
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
     
-    fn indexed_iter(&self) -> impl Iterator<Item = ([usize; D], &Self::Component)>;
+    fn indexed_iter(&self) -> impl Iterator<Item = (Self::Dim, &Self::Component)>;
 
-    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ([usize; D], &mut Self::Component)>;
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = (Self::Dim, &mut Self::Component)>;
 
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
@@ -104,10 +113,10 @@ pub trait Norm {
 
 
 /// [`TensorBase`] combined with basic mathematical operations and indexing.
-pub trait TensorOp<const D: usize> =
+pub trait TensorOp =
 where 
     for<'a> Self:
-        TensorBase<D> +
+        TensorBase +
         // Componentwise addition (left-hand side moved):
         Add<Output = Self> +
         Add<&'a Self, Output = Self> +
@@ -122,8 +131,8 @@ where
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
         // Component access and assignment via subscript:
-        Index<[usize; 2], Output = <Self as TensorBase<D>>::Component> +
-        IndexMut<[usize; 2]> +
+        Index<<Self as TensorBase>::Dim, Output = <Self as TensorBase>::Component> +
+        IndexMut<<Self as TensorBase>::Dim> +
         // Componentwise multiplication (left-hand side moved):
         Mul<Output = Self> +
         Mul<&'a Self, Output = Self> +
@@ -156,25 +165,26 @@ where
 
 
 /// Owned [`TensorBase`] combined with `serde` (de-)serialization.
-pub trait TensorSerde<const D: usize> = 'static + TensorBase<D> + DeserializeOwned + Serialize;
+pub trait TensorSerde = 'static + TensorBase + DeserializeOwned + Serialize;
 
 
 /// [`TensorOp`] and [`TensorSerde`].
-pub trait Tensor<const D: usize> = TensorOp<D> + TensorSerde<D>;
+pub trait Tensor = TensorOp + TensorSerde;
 
 
-pub trait Tensor2 = Tensor<2>;
+pub trait Tensor2 = Tensor<Dim = [usize; 2]>;
 
 
 /// Implementation of [`TensorBase`] for `ndarray::Array2`.
-impl<C: TensorComponent> TensorBase<2> for Array2<C> {
+impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
+    type Dim = [usize; 2];
 
-    fn from_num(num: Self::Component, shape: impl Into<[usize; 2]>) -> Self {
+    fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
         Self::from_elem(shape.into(), num)
     }
 
-    fn shape<S: From<[usize; 2]>>(&self) -> S {
+    fn shape<S: From<Self::Dim>>(&self) -> S {
         S::from(self.dim().into())
     }
     
@@ -187,6 +197,15 @@ impl<C: TensorComponent> TensorBase<2> for Array2<C> {
 
     fn transpose(&self) -> Self {
         self.t().to_owned()
+    }
+
+    fn as_slice(&self) -> &[Self::Component] {
+        Array2::as_slice(self).unwrap()
+    }
+
+    fn append<T>(&mut self, axis: usize, tensor: &T)
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array2::push(self, Axis(axis), ArrayView::from(tensor.as_slice())).unwrap()
     }
 
     fn append_row(&mut self, row: &[Self::Component]) {
@@ -207,11 +226,11 @@ impl<C: TensorComponent> TensorBase<2> for Array2<C> {
         self.mapv_inplace(f)
     }
 
-    fn indexed_iter(&self) -> impl Iterator<Item = ([usize; 2], &Self::Component)> {
+    fn indexed_iter(&self) -> impl Iterator<Item = (Self::Dim, &Self::Component)> {
         Array2::<C>::indexed_iter(self).map(|(idx, component)| (idx.into(), component))
     }
 
-    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = ([usize; 2], &mut Self::Component)> {
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = (Self::Dim, &mut Self::Component)> {
         Array2::<C>::indexed_iter_mut(self).map(|(idx, component)| (idx.into(), component))
     }
 
@@ -477,7 +496,7 @@ mod tests {
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// This function does not need assertions and does not need to be run as a test
     /// because it just needs to pass the compiler.
-    fn test_tensor_op_traits<T: TensorOp<D>, const D: usize>(mut t1: T, t2: T) {
+    fn test_tensor_op_traits<T: TensorOp<Dim = [usize; 2]>>(mut t1: T, t2: T) {
         // Negation (borrowing & moving):
         let t3 = -&t1;
         let _ = -t3;

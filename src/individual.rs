@@ -46,7 +46,7 @@ pub struct Individual<T: Tensor2> {
 
     /// Cost function used to calculate the error.
     #[serde(default = "CostFunction::default")]
-    cost_function: CostFunction<T, 2>,
+    cost_function: CostFunction<T>,
 }
 
 
@@ -68,7 +68,7 @@ impl<T: Tensor2> Individual<T> {
     ///
     /// # Returns
     /// New [`Individual`] with the given layers
-    pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T, 2>) -> Self {
+    pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
         Self {
             id: generate_uuid_v4(),
             layers,
@@ -103,7 +103,7 @@ impl<T: Tensor2> Individual<T> {
     }
 
     /// Returns a reference to the individual's cost function.
-    pub fn get_cost_function(&self) -> &CostFunction<T, 2> {
+    pub fn get_cost_function(&self) -> &CostFunction<T> {
         &self.cost_function
     }
 
@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_id() {
-        let individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::<T, 2>::default() };
+        let individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::<T>::default() };
         assert_eq!(individual.id(), 69420);
     }
 

@@ -32,7 +32,7 @@ fn test_sgd() {
                 activation: Activation::get("relu").unwrap(),
             },
         ],
-        CostFunction::<Array2<f64>, 2>::get("quadratic").unwrap(),
+        CostFunction::<Array2<f64>>::get("quadratic").unwrap(),
     );
     let input1 = array![
         [1., 2.],

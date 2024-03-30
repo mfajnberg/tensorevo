@@ -14,11 +14,11 @@ use crate::tensor::Tensor2;
 pub struct Layer<T: Tensor2> {
     pub weights: T,
     pub biases: T,
-    pub activation: Activation<T, 2>
+    pub activation: Activation<T>
 }
 
 impl<T: Tensor2> Layer<T> {
-    pub fn new(weights: T, biases: T, activation: Activation<T, 2>) -> Self {
+    pub fn new(weights: T, biases: T, activation: Activation<T>) -> Self {
         Self { weights, biases, activation }
     }
 
