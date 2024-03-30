@@ -38,9 +38,6 @@ pub trait TensorBase:
     /// Returns the shape of the tensor as a tuple of unsigned integers.
     fn shape<S: From<Self::Dim>>(&self) -> S;
     
-    /// Returns a vector of vectors of the tensor's components.
-    fn to_vec(&self) -> Vec<Vec<Self::Component>>;
-    
     /// Returns the transpose of itself as a new tensor.
     fn transpose(&self) -> Self;
 
@@ -48,12 +45,6 @@ pub trait TensorBase:
 
     fn append<T>(&mut self, axis: usize, tensor: &T)
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
-
-    /// Append a row to the tensor.
-    fn append_row(&mut self, row: &[Self::Component]);
-
-    /// Append a column to the tensor.
-    fn append_column(&mut self, column: &[Self::Component]);
 
     /// Calls function `f` on each component and returns the result as a new tensor.
     fn map<F>(&self, f: F) -> Self
@@ -188,13 +179,6 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
         S::from(self.dim().into())
     }
     
-    fn to_vec(&self) -> Vec<Vec<Self::Component>> {
-        self.rows()
-            .into_iter()
-            .map(|row| row.to_vec())
-            .collect()
-    }
-
     fn transpose(&self) -> Self {
         self.t().to_owned()
     }
@@ -206,14 +190,6 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     fn append<T>(&mut self, axis: usize, tensor: &T)
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
         Array2::push(self, Axis(axis), ArrayView::from(tensor.as_slice())).unwrap()
-    }
-
-    fn append_row(&mut self, row: &[Self::Component]) {
-        self.push_row(ArrayView::from(row)).unwrap()
-    }
-
-    fn append_column(&mut self, column: &[Self::Component]) {
-        self.push_column(ArrayView::from(column)).unwrap()
     }
 
     fn map<F>(&self, f: F) -> Self
@@ -346,20 +322,6 @@ mod tests {
             ];
             let shape: [usize; 2] = TensorBase::shape(&tensor);
             assert_eq!(shape, [2, 3]);
-        }
-
-        #[test]
-        fn test_to_vec() {
-            let tensor = array![
-                [0., 1., 2.],
-                [3., 4., 5.]
-            ];
-            let vector = TensorBase::to_vec(&tensor);
-            let expected = vec![
-                [0., 1., 2.],
-                [3., 4., 5.]
-            ];
-            assert_eq!(vector, expected);
         }
 
         #[test]
