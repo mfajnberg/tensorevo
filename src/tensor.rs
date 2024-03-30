@@ -5,12 +5,12 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, 
 
 use ndarray::{Array1, Array2, ArrayView, Axis};
 use num_traits::FromPrimitive;
-use num_traits::real::Real;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::component::TensorComponent;
 use crate::dimension::{Dimension, HasLowerDimension};
+use crate::ops::{Dot, Norm};
 
 
 /// Basic methods of multi-dimensional arrays ("tensors").
@@ -64,44 +64,7 @@ pub trait TensorBase:
 }
 
 
-/// Dot product aka. matrix multiplication.
-pub trait Dot<Rhs = Self> {
-    /// The output type of the multiplication operation.
-    type Output;
-
-    /// Returns the dot product of `self` on the left and `rhs` on the right.
-    fn dot(&self, rhs: Rhs) -> Self::Output;
-}
-
-
 /// Calculate norms of a tensor.
-pub trait Norm {
-    /// Output type of any norm method.
-    type Output: TensorComponent;
-
-    /// Returns the supremum norm.
-    fn norm_max(&self) -> Self::Output;
-
-    /// Returns the p-norm for any `p` >= 1.
-    fn norm_p(&self, p: impl Real) -> Self::Output;
-
-    /// Returns the l1-norm (manhattan norm).
-    fn norm_1(&self) -> Self::Output {
-        self.norm_p(1.)
-    }
-
-    /// Returns the l2-norm (euclidian norm).
-    fn norm_2(&self) -> Self::Output {
-        self.norm_p(2.)
-    }
-
-    /// Alias for `norm_2`.
-    fn norm(&self) -> Self::Output {
-        self.norm_2()
-    }
-}
-
-
 /// [`TensorBase`] combined with basic mathematical operations and indexing.
 pub trait TensorOp =
 where 
@@ -325,75 +288,6 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     }
 }
 
-
-/// Implementation of `Dot` for `ndarray::Array2` (right-hand side moved).
-impl<C: TensorComponent> Dot for Array2<C> {
-    type Output = Self;
-
-    fn dot(&self, rhs: Self) -> Self::Output {
-        self.dot(&rhs)
-    }
-}
-
-
-/// Implementation of `Dot` for `ndarray::Array2` (right-hand side borrowed).
-impl<C: TensorComponent> Dot<&Array2<C>> for Array2<C> {
-    type Output = Self;
-
-    fn dot(&self, rhs: &Self) -> Self::Output {
-        self.dot(rhs)
-    }
-}
-
-
-/// Implementation of `Norm` for `ndarray::Array2`.
-impl<P: TensorComponent> Norm for Array2<P> {
-    type Output = P;
-
-    /// Returns the largest absolute value of all array components.
-    fn norm_max(&self) -> Self::Output {
-        self.iter().fold(
-            P::zero(),
-            |largest, component| {
-                let absolute = component.abs();
-                if largest > absolute {
-                    largest
-                } else {
-                    absolute
-                }
-            }
-        )
-    }
-
-    /// Converts `p` to `f32` before calculating the norm.
-    ///
-    /// Panics, if `p` is less than 1.
-    fn norm_p(&self, p: impl Real) -> Self::Output {
-        let pf32 = p.to_f32().unwrap();
-        if pf32 < 1. { panic!("P-norm undefined for p < 1") }
-        self.iter()
-            .map(|component| component.abs().powf(p))
-            .sum::<P>()
-            .powf(1./pf32)
-    }
-
-    /// Sums the absolute values of all array components.
-    fn norm_1(&self) -> Self::Output {
-        self.iter()
-            .map(|component| component.abs())
-            .sum()
-    }
-
-    /// Takes the square root of the squares of all array components.
-    fn norm_2(&self) -> Self::Output {
-        self.iter()
-            .map(|component| component.abs().powf(2.))
-            .sum::<P>()
-            .sqrt()
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use ndarray::array;
@@ -498,51 +392,6 @@ mod tests {
             ];
             assert_eq!(result, expected);
         }
-    }
-
-    #[test]
-    fn test_dot_array2() {
-        let tensor_a = array![
-            [0., 1., 2.],
-            [3., 2., 1.]
-        ];
-        let tensor_b = array![
-            [-1., -2.],
-            [-3., -2.],
-            [-1.,  0.]
-        ];
-        let result = Dot::dot(&tensor_a, tensor_b);
-        let expected = array![
-            [ -5.,  -2.],
-            [-10., -10.]
-        ];
-        assert_eq!(result, expected);
-
-        let result2 = Dot::dot(&result, &result);
-        let expected2 = array![
-            [45., 30.],
-            [150., 120.]
-        ];
-        assert_eq!(result2, expected2);
-    }
-
-    #[test]
-    fn test_norm_array2() {
-        let tensor = array![
-            [ 0.,  1.,  2.],
-            [-3., -1.,  1.]
-        ];
-        let result = tensor.norm_max();
-        assert_eq!(result, 3.);
-
-        let result = tensor.norm_p(80.).round();
-        assert_eq!(result, 3.);
-
-        let result = tensor.norm_1();
-        assert_eq!(result, 8.);
-
-        let result = tensor.norm_2();
-        assert_eq!(result, 4.);
     }
 
     /// Tests that `Array2` fully implements `TensorOp`.

@@ -10,6 +10,7 @@ pub mod dimension;
 pub mod evolution;
 pub mod individual;
 pub mod layer;
+pub mod ops;
 pub mod tensor;
 pub mod utils;
 pub mod world;
