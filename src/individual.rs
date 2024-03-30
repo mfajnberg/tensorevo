@@ -16,7 +16,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::layer::Layer;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 use crate::cost_function::CostFunction;
 
 #[cfg(test)]
@@ -35,7 +35,7 @@ fn generate_uuid_v4() -> u128 {
 /// (See [`Fn` implementation](#impl-Fn<(%26T,)>-for-Individual<T>) below.)
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
-pub struct Individual<T: Tensor> {
+pub struct Individual<T: Tensor2> {
     /// Unique identifier.
     id: u128,
 
@@ -46,7 +46,7 @@ pub struct Individual<T: Tensor> {
 
     /// Cost function used to calculate the error.
     #[serde(default = "CostFunction::default")]
-    cost_function: CostFunction<T>,
+    cost_function: CostFunction<T, 2>,
 }
 
 
@@ -59,7 +59,7 @@ pub enum LoadError {
 }
 
 
-impl<T: Tensor> Individual<T> {
+impl<T: Tensor2> Individual<T> {
     /// Constructs a new individual from a vector of layers.
     ///
     /// # Arguments
@@ -68,7 +68,7 @@ impl<T: Tensor> Individual<T> {
     ///
     /// # Returns
     /// New [`Individual`] with the given layers
-    pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T>) -> Self {
+    pub fn new(layers: Vec<Layer<T>>, cost_function: CostFunction<T, 2>) -> Self {
         Self {
             id: generate_uuid_v4(),
             layers,
@@ -103,7 +103,7 @@ impl<T: Tensor> Individual<T> {
     }
 
     /// Returns a reference to the individual's cost function.
-    pub fn get_cost_function(&self) -> &CostFunction<T> {
+    pub fn get_cost_function(&self) -> &CostFunction<T, 2> {
         &self.cost_function
     }
 
@@ -230,7 +230,7 @@ impl<T: Tensor> Individual<T> {
         learning_rate: f32,
         validation_data: Option<(&T, &T)>,
     ) {
-        let (_, batch_size) = training_data[0].0.shape();
+        let batch_size = training_data[0].0.shape()[1];
         let update_factor = T::Component::from_f32(learning_rate / batch_size as f32).unwrap();
         let num_batches = training_data.len();
         for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
@@ -253,7 +253,7 @@ impl<T: Tensor> Individual<T> {
 }
 
 
-impl<T: Tensor> Display for Individual<T> {
+impl<T: Tensor2> Display for Individual<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let indent = "  ";
         let mut layers_display = format!("[\n{indent}");
@@ -274,7 +274,7 @@ impl<T: Tensor> Display for Individual<T> {
 ///
 /// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
 /// (See [`Individual::call`].)
-impl<T: Tensor> FnOnce<(&T,)> for Individual<T> {
+impl<T: Tensor2> FnOnce<(&T,)> for Individual<T> {
     type Output = T;
 
     /// See [`Individual::call`].
@@ -288,7 +288,7 @@ impl<T: Tensor> FnOnce<(&T,)> for Individual<T> {
 ///
 /// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
 /// (See [`Individual::call`].)
-impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
+impl<T: Tensor2> FnMut<(&T,)> for Individual<T> {
     /// See [`Individual::call`].
     extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
         self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
@@ -338,11 +338,11 @@ impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
 /// let output = individual(&input);
 /// assert_eq!(output, expected_output);
 /// ```
-impl<T: Tensor> Fn<(&T,)> for Individual<T> {
+impl<T: Tensor2> Fn<(&T,)> for Individual<T> {
     /// Performs a full forward pass for a given input and returns the network's output.
     ///
     /// # Arguments
-    /// * `input` - [Tensor] with a shape that matches the input layer.
+    /// * `input` - [Tensor2] with a shape that matches the input layer.
     ///
     /// # Returns
     /// Output tensor returned from the last layer
@@ -355,7 +355,7 @@ impl<T: Tensor> Fn<(&T,)> for Individual<T> {
 /// Allows access to layers by index.
 /// 
 /// Index 0 corresponds to the first hidden layer.
-impl<T: Tensor> Index<usize> for Individual<T> {
+impl<T: Tensor2> Index<usize> for Individual<T> {
     type Output = Layer<T>;
 
     fn index(&self, idx: usize) -> &Self::Output {
@@ -365,7 +365,7 @@ impl<T: Tensor> Index<usize> for Individual<T> {
 
 
 /// Allows turning a reference to an `Individual` into an iterator over [`Layer`] references.
-impl<'a, T: Tensor> IntoIterator for &'a Individual<T> {
+impl<'a, T: Tensor2> IntoIterator for &'a Individual<T> {
     type Item = &'a Layer<T>;
     type IntoIter = Iter<'a, Layer<T>>;
 
@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_id() {
-        let individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::<T>::default() };
+        let individual = Individual { id: 69420, layers: vec![], cost_function: CostFunction::<T, 2>::default() };
         assert_eq!(individual.id(), 69420);
     }
 

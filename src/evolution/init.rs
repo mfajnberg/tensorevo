@@ -8,7 +8,7 @@ use crate::component::TensorComponent;
 use crate::cost_function::CostFunction;
 use crate::individual::Individual;
 use crate::layer::Layer;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 
 
 pub fn init_weight<C: TensorComponent>(rng: &mut ThreadRng, can_zero: bool) -> Option<C> {
@@ -20,7 +20,7 @@ pub fn init_weight<C: TensorComponent>(rng: &mut ThreadRng, can_zero: bool) -> O
 }
 
 
-pub fn random_individual<T: Tensor, R: Clone + SampleRange<usize>>(
+pub fn random_individual<T: Tensor2, R: Clone + SampleRange<usize>>(
     num_layers: usize,
     input_length: usize,
     output_length: usize,

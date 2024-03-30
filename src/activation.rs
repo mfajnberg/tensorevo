@@ -24,7 +24,7 @@ type TFunc<T> = fn(&T) -> T;
 ///
 /// [`Layer`]: crate::layer::Layer
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Activation<T: TensorBase> {
+pub struct Activation<T: TensorBase<D>, const D: usize> {
     name: String,
     function: TFunc<T>,
     derivative: TFunc<T>,
@@ -35,7 +35,7 @@ pub struct Activation<T: TensorBase> {
 ///
 /// Given some `act: Activation<T>` and a `tensor: impl TensorBase` you can call the activation
 /// function simply by doing **`act(&tensor)`** and the derivative via **`act.d(&tensor)`**.
-impl<T: TensorBase> Activation<T> {
+impl<T: TensorBase<D>, const D: usize> Activation<T, D> {
     /// Basic constructor.
     ///
     /// # Arguments
@@ -65,7 +65,7 @@ impl<T: TensorBase> Activation<T> {
 /// Makes `Activation<T>` callable by value (i.e. consuming the instance).
 ///
 /// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
-impl<T: TensorBase> FnOnce<(&T,)> for Activation<T> {
+impl<T: TensorBase<D>, const D: usize> FnOnce<(&T,)> for Activation<T, D> {
     type Output = T;
 
     /// Proxy for the actual underlying activation function.
@@ -78,7 +78,7 @@ impl<T: TensorBase> FnOnce<(&T,)> for Activation<T> {
 /// Makes `Activation<T>` callable by mutable reference.
 ///
 /// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
-impl<T: TensorBase> FnMut<(&T,)> for Activation<T> {
+impl<T: TensorBase<D>, const D: usize> FnMut<(&T,)> for Activation<T, D> {
     /// Proxy for the actual underlying activation function.
     extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
         (self.function)(args.0)
@@ -97,7 +97,7 @@ impl<T: TensorBase> FnMut<(&T,)> for Activation<T> {
 /// use tensorevo::activation::Activation;
 /// use tensorevo::tensor::TensorBase;
 ///
-/// fn zero_function<T: TensorBase>(t: &T) -> T {
+/// fn zero_function<T: TensorBase<D>, const D: usize>(t: &T) -> T {
 ///     T::zeros(t.shape())
 /// }
 ///
@@ -113,7 +113,7 @@ impl<T: TensorBase> FnMut<(&T,)> for Activation<T> {
 /// In practice they are obviously different functions.
 /// The call operator always calls the actual activation function.
 /// To call the derivative use the [`Activation::d`] method.
-impl<T: TensorBase> Fn<(&T,)> for Activation<T> {
+impl<T: TensorBase<D>, const D: usize> Fn<(&T,)> for Activation<T, D> {
     /// Proxy for the actual underlying activation function.
     extern "rust-call" fn call(&self, args: (&T,)) -> Self::Output {
         (self.function)(args.0)
@@ -122,7 +122,7 @@ impl<T: TensorBase> Fn<(&T,)> for Activation<T> {
 
 
 /// Allows [`serde`] to serialize [`Activation`] objects.
-impl<T: 'static + TensorBase> Serialize for Activation<T> {
+impl<T: 'static + TensorBase<D>, const D: usize> Serialize for Activation<T, D> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         Registered::serialize_as_key(self, serializer)
     }
@@ -130,8 +130,8 @@ impl<T: 'static + TensorBase> Serialize for Activation<T> {
 
 
 /// Allows [`serde`] to deserialize to [`Activation`] objects.
-impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+impl<'de, T: 'static + TensorBase<D>, const D: usize> Deserialize<'de> for Activation<T, D> {
+    fn deserialize<DE: Deserializer<'de>>(deserializer: DE) -> Result<Self, DE::Error> {
         Registered::deserialize_from_key(deserializer)
     }
 }
@@ -159,11 +159,11 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 /// use tensorevo::activation::{Activation, Registered};
 /// use tensorevo::tensor::TensorOp;
 ///
-/// fn double<T: TensorOp>(t: &T) -> T {
+/// fn double<T: TensorOp<D>, const D: usize>(t: &T) -> T {
 ///     t + t
 /// }
 ///
-/// fn to_two<T: TensorOp>(t: &T) -> T {
+/// fn to_two<T: TensorOp<D>, const D: usize>(t: &T) -> T {
 ///     let ones = T::from_num(T::Component::one(), t.shape());
 ///     &ones + &ones
 /// }
@@ -172,24 +172,24 @@ impl<'de, T: 'static + TensorBase> Deserialize<'de> for Activation<T> {
 ///     type T = Array2::<f32>;
 ///
 ///     // Register a custom activation function:
-///     Activation::<T>::new("double", double, to_two).register();
+///     Activation::<T, 2>::new("double", double, to_two).register();
 ///
 ///     // Get a previously registered custom activation function:
-///     let activation = Activation::<T>::get("double").unwrap();
+///     let activation = Activation::<T, 2>::get("double").unwrap();
 ///     let input = array![[2., -1.]];
 ///     assert_eq!(activation(&input), array![[4., -2.]]);
 ///     assert_eq!(activation.d(&input), array![[2., 2.]]);
 ///
 ///     // No activation with the name `foo` was registered:
-///     assert_eq!(Activation::<T>::get("foo"), None);
+///     assert_eq!(Activation::<T, 2>::get("foo"), None);
 ///
 ///     // Common activation functions are available by default:
-///     let relu = Activation::<T>::get("relu").unwrap();
+///     let relu = Activation::<T, 2>::get("relu").unwrap();
 ///     assert_eq!(relu(&input), array![[2., 0.]]);
 ///     assert_eq!(relu.d(&input), array![[1., 0.]]);
 /// }
 /// ```
-impl<T: 'static + TensorBase> Registered<String> for Activation<T> {
+impl<T: 'static + TensorBase<D>, const D: usize> Registered<String> for Activation<T, D> {
     /// Returns a reference to the name provided in the [`Activation::new`] constructor.
     fn key(&self) -> &String {
         &self.name
@@ -226,7 +226,7 @@ pub mod functions {
     /// Reference implementation of the sigmoid activation function.
     ///
     /// Takes a tensor as input and returns a new tensor.
-    pub fn sigmoid<T: TensorBase>(tensor: &T) -> T {
+    pub fn sigmoid<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         tensor.map(sigmoid_component)
     }
     
@@ -234,7 +234,7 @@ pub mod functions {
     /// Reference implementation of the sigmoid activation function.
     ///
     /// Takes a tensor as input and mutates it in place.
-    pub fn sigmoid_inplace<T: TensorBase>(tensor: &mut T) {
+    pub fn sigmoid_inplace<T: TensorBase<D>, const D: usize>(tensor: &mut T) {
         tensor.map_inplace(sigmoid_component);
     }
     
@@ -249,7 +249,7 @@ pub mod functions {
     /// Reference implementation of the derivative of the sigmoid activation function.
     ///
     /// Takes a tensor as input and returns a new tensor.
-    pub fn sigmoid_prime<T: TensorBase>(tensor: &T) -> T {
+    pub fn sigmoid_prime<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         tensor.map(sigmoid_prime_component)
     }
     
@@ -264,7 +264,7 @@ pub mod functions {
     /// Reference implementation of the Rectified Linear Unit (RELU) activation function.
     ///
     /// Takes a tensor as input and returns a new tensor.
-    pub fn relu<T: TensorBase>(tensor: &T) -> T {
+    pub fn relu<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         tensor.map(relu_component)
     }
     
@@ -279,7 +279,7 @@ pub mod functions {
     /// Reference implementation of the derivative of the Rectified Linear Unit (RELU) activation function.
     ///
     /// Takes a tensor as input and returns a new tensor.
-    pub fn relu_prime<T: TensorBase>(tensor: &T) -> T {
+    pub fn relu_prime<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         tensor.map(relu_prime_component)
     }
     
@@ -293,13 +293,13 @@ pub mod functions {
 
 
     /// Identity function returning a clone of the input `tensor`.
-    pub fn identity<T: TensorBase>(tensor: &T) -> T {
+    pub fn identity<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         tensor.clone()
     }
 
 
     /// Returns a tensor filled with ones with the shape of `tensor`. (Derivative of the identity.)
-    pub fn to_one<T: TensorBase>(tensor: &T) -> T {
+    pub fn to_one<T: TensorBase<D>, const D: usize>(tensor: &T) -> T {
         T::from_num(T::Component::one(), tensor.shape())
     }
 }
@@ -316,7 +316,7 @@ mod tests {
 
         #[test]
         fn test_new() {
-            let activation = Activation::<Array2<f32>>::new("relu", relu, relu_prime);
+            let activation = Activation::<Array2<f32>, 2>::new("relu", relu, relu_prime);
             assert_eq!(
                 activation,
                 Activation { name: "relu".to_owned(), function: relu, derivative: relu_prime },
@@ -338,7 +338,7 @@ mod tests {
 
         #[test]
         fn test_registered() {
-            type NDActivation = Activation<Array2<f32>>;
+            type NDActivation = Activation<Array2<f32>, 2>;
 
             // Nothing registered under the key "foo".
             let option = NDActivation::get("foo");

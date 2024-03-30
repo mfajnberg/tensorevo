@@ -1,8 +1,8 @@
 use crate::individual::Individual;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 
 
-pub fn get_species<T: Tensor>(individual: &Individual<T>) -> String {
+pub fn get_species<T: Tensor2>(individual: &Individual<T>) -> String {
     individual.num_layers().to_string()
 }
 
