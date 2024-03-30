@@ -1,9 +1,9 @@
 //! Definition of the [`TensorBase`] and related traits, as well as some trait aliases combining them.
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use ndarray::{Array2, ArrayView, Axis};
+use ndarray::{Array1, Array2, ArrayView, Axis};
 use num_traits::FromPrimitive;
 use num_traits::real::Real;
 use serde::Serialize;
@@ -17,7 +17,6 @@ use crate::dimension::{Dimension, HasLowerDimension};
 pub trait TensorBase:
     Clone
     + Debug
-    + Display
     + PartialEq
     + Sized
 {
@@ -166,6 +165,113 @@ pub trait Tensor = TensorOp + TensorSerde;
 pub trait Tensor2 = Tensor<Dim = [usize; 2]>;
 
 
+impl<C: TensorComponent> TensorBase for Vec<C> {
+    type Component = C;
+    type Dim = usize;
+
+    fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
+        vec![num; shape.into()]
+    }
+
+    fn shape<S: From<Self::Dim>>(&self) -> S {
+        self.len().into()
+    }
+
+    fn transpose(&self) -> Self {
+        self.clone()
+    }
+
+    fn as_slice(&self) -> &[Self::Component] {
+        Vec::as_slice(self)
+    }
+
+    fn append<T>(&mut self, _axis: usize, tensor: &T)
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Vec::push(self, tensor.as_slice()[0])
+    }
+
+    fn map<F>(&self, f: F) -> Self
+    where F: FnMut(Self::Component) -> Self::Component {
+        self.clone() // TODO
+    }
+
+    fn map_inplace<F>(&mut self, f: F)
+    where F: FnMut(Self::Component) -> Self::Component {
+        // todo
+    }
+
+    fn indexed_iter(&self) -> impl Iterator<Item = (Self::Dim, &Self::Component)> {
+        <&'_ Vec<Self::Component>>::into_iter(self).enumerate()
+    }
+
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = (Self::Dim, &mut Self::Component)> {
+        <&'_ mut Vec<Self::Component>>::into_iter(self).enumerate()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Self::Component> {
+        <&'_ Vec<Self::Component>>::into_iter(self)
+    }
+
+    fn sum_axis(&self, axis: usize) -> Self {
+        self.clone() // TODO
+    }
+}
+
+
+/// Implementation of [`TensorBase`] for `ndarray::Array1`.
+impl<C: TensorComponent> TensorBase for Array1<C> {
+    type Component = C;
+    type Dim = usize;
+
+    fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
+        Self::from_elem(shape.into(), num)
+    }
+
+    fn shape<S: From<Self::Dim>>(&self) -> S {
+        S::from(self.dim())
+    }
+
+    fn transpose(&self) -> Self {
+        self.t().to_owned()
+    }
+
+    fn as_slice(&self) -> &[Self::Component] {
+        Array1::as_slice(self).unwrap()
+    }
+
+    fn append<T>(&mut self, axis: usize, tensor: &T)
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array1::push(self, Axis(axis), ArrayView::from_shape((), tensor.as_slice()).unwrap()).unwrap()
+    }
+
+    fn map<F>(&self, f: F) -> Self
+    where F: FnMut(C) -> C {
+        self.mapv(f)
+    }
+
+    fn map_inplace<F>(&mut self, f: F)
+    where F: FnMut(C) -> C {
+        self.mapv_inplace(f)
+    }
+
+    fn indexed_iter(&self) -> impl Iterator<Item = (Self::Dim, &Self::Component)> {
+        Array1::<C>::indexed_iter(self).map(|(idx, component)| (idx.into(), component))
+    }
+
+    fn indexed_iter_mut(&mut self) -> impl Iterator<Item = (Self::Dim, &mut Self::Component)> {
+        Array1::<C>::indexed_iter_mut(self).map(|(idx, component)| (idx.into(), component))
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Self::Component> {
+        Array1::<C>::iter(self)
+    }
+
+    fn sum_axis(&self, axis: usize) -> Self {
+        Array1::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
+    }
+}
+
+
 /// Implementation of [`TensorBase`] for `ndarray::Array2`.
 impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
@@ -215,7 +321,7 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     }
 
     fn sum_axis(&self, axis: usize) -> Self {
-        self.sum_axis(Axis(axis)).insert_axis(Axis(axis))
+        Array2::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
     }
 }
 

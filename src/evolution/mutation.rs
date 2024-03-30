@@ -127,15 +127,15 @@ fn add_new_connection<T: Tensor2>(
         let (num_rows, num_cols) = weights.shape();
         let mut new_row = vec![T::Component::zero(); num_cols];
         new_row[prev_neuron_idx] = T::Component::one();
-        weights.append_row(new_row.as_slice());
+        weights.append(0, &new_row);
         // Remember the index of the new neuron for the next iteration.
         prev_neuron_idx = num_rows;
         // Append a zero to the bias vector.
-        layers[layer_idx].biases.append_row(vec![T::Component::zero()].as_slice());
+        layers[layer_idx].biases.append(0, &vec![T::Component::zero()]);
         // Append a column to the next layer's weight matrix with all zeros.
         let weights = &mut layers[layer_idx + 1].weights;
         let (num_rows, _) = weights.shape();
-        weights.append_column(vec![T::Component::zero(); num_rows].as_slice());
+        weights.append(1, &vec![T::Component::zero(); num_rows]);
     }
     layers[end_layer_idx].weights[[end_neuron_idx, prev_neuron_idx]] = init_weight(rng, false).unwrap();
 }
