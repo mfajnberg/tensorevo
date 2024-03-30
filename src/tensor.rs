@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::component::TensorComponent;
-use crate::dimension::{Dimension, HasLowerDimension};
+use crate::dimension::{Dim1, Dim2, Dimension, HasLowerDimension};
 use crate::ops::{Dot, Norm};
 
 
@@ -125,12 +125,14 @@ pub trait TensorSerde = 'static + TensorBase + DeserializeOwned + Serialize;
 pub trait Tensor = TensorOp + TensorSerde;
 
 
-pub trait Tensor2 = Tensor<Dim = [usize; 2]>;
+pub trait Tensor1 = Tensor<Dim = Dim1>;
+
+pub trait Tensor2 = Tensor<Dim = Dim2>;
 
 
 impl<C: TensorComponent> TensorBase for Vec<C> {
     type Component = C;
-    type Dim = usize;
+    type Dim = Dim1;
 
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
         vec![num; shape.into()]
@@ -184,7 +186,7 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
 /// Implementation of [`TensorBase`] for `ndarray::Array1`.
 impl<C: TensorComponent> TensorBase for Array1<C> {
     type Component = C;
-    type Dim = usize;
+    type Dim = Dim1;
 
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
         Self::from_elem(shape.into(), num)
@@ -238,7 +240,7 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
 /// Implementation of [`TensorBase`] for `ndarray::Array2`.
 impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
-    type Dim = [usize; 2];
+    type Dim = Dim2;
 
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
         Self::from_elem(shape.into(), num)
@@ -320,7 +322,7 @@ mod tests {
                 [0., 1., 2.],
                 [3., 4., 5.]
             ];
-            let shape: [usize; 2] = TensorBase::shape(&tensor);
+            let shape: Dim2 = TensorBase::shape(&tensor);
             assert_eq!(shape, [2, 3]);
         }
 
@@ -413,7 +415,7 @@ mod tests {
     /// Tests that the `TensorOp` trait alias covers the expected traits.
     /// This function does not need assertions and does not need to be run as a test
     /// because it just needs to pass the compiler.
-    fn test_tensor_op_traits<T: TensorOp<Dim = [usize; 2]>>(mut t1: T, t2: T) {
+    fn test_tensor_op_traits<T: TensorOp<Dim = Dim2>>(mut t1: T, t2: T) {
         // Negation (borrowing & moving):
         let t3 = -&t1;
         let _ = -t3;
