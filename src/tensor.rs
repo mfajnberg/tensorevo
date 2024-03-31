@@ -157,12 +157,14 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
 
     fn map<F>(&self, f: F) -> Self
     where F: FnMut(Self::Component) -> Self::Component {
-        self.clone() // TODO
+        self.iter().copied().map(f).collect()
     }
 
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component {
-        // todo
+        // Not actually in-place at all, but allocating a whole new vector before replacing.
+        // It is hard to do this without unsafe code.
+        *self = self.map(f);
     }
 
     fn indexed_iter(&self) -> impl Iterator<Item = (Self::Dim, &Self::Component)> {
@@ -177,8 +179,8 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         <&'_ Vec<Self::Component>>::into_iter(self)
     }
 
-    fn sum_axis(&self, axis: usize) -> Self {
-        self.clone() // TODO
+    fn sum_axis(&self, _axis: usize) -> Self {
+        vec![self.iter().copied().sum()]
     }
 }
 
