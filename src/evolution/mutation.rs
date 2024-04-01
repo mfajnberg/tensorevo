@@ -41,8 +41,7 @@ pub fn mutate_add_layer<T: Tensor2>(layers: &mut Vec<Layer<T>>, rng: &mut Thread
     let mut following_weights = T::zeros([following_weights_num_rows, new_weights_num_rows]);
     let mut connection_idx = 0;
     following_layer.weights.indexed_iter().for_each(
-        |(idx, weight)| if *weight != zero_component {
-            let (row_idx, col_idx) = (idx[0], idx[1]);
+        |((row_idx, col_idx), weight)| if *weight != zero_component {
             new_weights[[connection_idx, col_idx]] = T::Component::one();
             following_weights[[row_idx, connection_idx]] = *weight;
             connection_idx += 1;
