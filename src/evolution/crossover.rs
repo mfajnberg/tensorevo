@@ -2,10 +2,11 @@ use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 
 use crate::evolution::init::init_weight;
-use crate::tensor::Tensor2;
+use crate::dimension::Dim2;
+use crate::tensor::TensorBase;
 
 
-pub fn crossover_layer_weights<T: Tensor2>(
+pub fn crossover_layer_weights<T: TensorBase<Dim = Dim2>>(
     new_weights: &mut T,
     weights_p1: &T,
     weights_p2: &T,
@@ -36,7 +37,7 @@ pub fn crossover_layer_weights<T: Tensor2>(
 }
 
 
-pub fn crossover_layer_biases<T: Tensor2>(
+pub fn crossover_layer_biases<T: TensorBase<Dim = Dim2>>(
     new_biases: &mut T,
     biases_p1: &T,
     biases_p2: &T,
