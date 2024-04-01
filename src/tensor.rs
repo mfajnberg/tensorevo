@@ -17,6 +17,9 @@ use crate::ops::{Dot, Norm};
 pub trait TensorBase:
     Clone
     + Debug
+    // Component access and assignment via subscript:
+    + Index<Self::Dim, Output = Self::Component>
+    + IndexMut<Self::Dim>
     + PartialEq
     + Sized
 {
@@ -84,7 +87,7 @@ pub trait TensorBase:
 
 
 /// Calculate norms of a tensor.
-/// [`TensorBase`] combined with basic mathematical operations and indexing.
+/// [`TensorBase`] combined with basic mathematical operations.
 pub trait TensorOp =
 where 
     for<'a> Self:
@@ -102,9 +105,6 @@ where
         // Dot product:
         Dot<Output = Self> +
         Dot<&'a Self, Output = Self> +
-        // Component access and assignment via subscript:
-        Index<<Self as TensorBase>::Dim, Output = <Self as TensorBase>::Component> +
-        IndexMut<<Self as TensorBase>::Dim> +
         // Componentwise multiplication (left-hand side moved):
         Mul<Output = Self> +
         Mul<&'a Self, Output = Self> +
