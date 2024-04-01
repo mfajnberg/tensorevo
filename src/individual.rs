@@ -166,7 +166,7 @@ impl<T: Tensor2> Individual<T> {
         let delta = cost_derivative * activation_derivative;
         // Calculate and add the last layer's gradient components first.
         nabla_weights.push(delta.dot(activations[num_layers - 2].transpose()));
-        nabla_biases.push(delta.sum_axis(1));
+        nabla_biases.push(delta.sum_axis_same_dim(1));
         // Loop over the remaining layer indices in reverse order,
         // i.e. starting with the second to last index (`num_layers - 2`) and ending with `0`.
         for layer_num in (0..num_layers - 1).rev() {
@@ -180,7 +180,7 @@ impl<T: Tensor2> Individual<T> {
             let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
             // Calculate and add the layer's gradient components.
             nabla_weights.push(delta.dot(previous_activation.transpose()));
-            nabla_biases.push(delta.sum_axis(1));
+            nabla_biases.push(delta.sum_axis_same_dim(1));
         }
         (nabla_weights, nabla_biases)
     }

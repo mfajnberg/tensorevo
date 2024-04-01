@@ -69,6 +69,8 @@ pub trait TensorBase:
     fn sum_axis<T>(&self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
+    fn sum_axis_same_dim(&self, axis: usize) -> Self;
+
     fn insert_axis<T>(self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher>;
 }
@@ -202,6 +204,10 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         T::from_num(self.iter().copied().sum(), ())
     }
 
+    fn sum_axis_same_dim(&self, _axis: usize) -> Self {
+        vec![self.iter().copied().sum()]
+    }
+
     fn insert_axis<T>(self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher> {
         let shape = if axis == 0 {
@@ -275,6 +281,10 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
     fn sum_axis<T>(&self, _axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
         T::from_num(Array1::sum(self), ())
+    }
+
+    fn sum_axis_same_dim(&self, axis: usize) -> Self {
+        Array1::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
     }
 
     fn insert_axis<T>(self, axis: usize) -> T
@@ -352,6 +362,10 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
         let axis_sum_iterator = Array2::axis_iter(self, Axis(axis)).map(|subview| subview.sum());
         T::from_iter(axis_sum_iterator, Array2::len_of(self, Axis(axis)))
+    }
+
+    fn sum_axis_same_dim(&self, axis: usize) -> Self {
+        Array2::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
     }
 
     fn insert_axis<T>(self, axis: usize) -> T
