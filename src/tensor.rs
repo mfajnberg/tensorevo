@@ -1,4 +1,4 @@
-//! Definition of the [`TensorBase`] and related traits, as well as some trait aliases combining them.
+//! Definition of the [`TensorBase`] trait, as well as some useful trait aliases.
 
 use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -40,14 +40,16 @@ pub trait TensorBase:
         I: IntoIterator<Item = Self::Component>,
         S: Into<Self::Dim>;
 
-    /// Returns the shape of the tensor as a tuple of unsigned integers.
+    /// Returns the shape of the tensor.
     fn shape<S: From<Self::Dim>>(&self) -> S;
     
     /// Returns the transpose of itself as a new tensor.
     fn transpose(&self) -> Self;
 
+    /// Returns all the tensor's components as a slice in logical order.
     fn as_slice(&self) -> &[Self::Component];
 
+    /// Append a `tensor` of lower dimensionality along the specified `axis`.
     fn append<T>(&mut self, axis: usize, tensor: &T)
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
@@ -58,11 +60,14 @@ pub trait TensorBase:
     /// Calls function `f` on each component mutating the tensor in place.
     fn map_inplace<F>(&mut self, f: F)
     where F: FnMut(Self::Component) -> Self::Component;
-    
+
+    /// Return an iterator of indexes and references to the components of the tensor.
     fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)>;
 
+    /// Return an iterator of indexes and mutable references to the components of the tensor.
     fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)>;
 
+    /// Returns an iterator of references to the components of the tensor (in logical order).
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
     /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of a lower dimensionality.
@@ -72,6 +77,7 @@ pub trait TensorBase:
     /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of the same dimensionality.
     fn sum_axis_same_dim(&self, axis: usize) -> Self;
 
+    /// Transforms the tensor into one with an additional axis/dimension.
     fn insert_axis<T>(self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher>;
 }
@@ -143,6 +149,7 @@ pub trait Tensor1 = Tensor<Dim = Dim1>;
 pub trait Tensor2 = Tensor<Dim = Dim2>;
 
 
+/// Implementation of [`TensorBase`] for [`Vec`].
 impl<C: TensorComponent> TensorBase for Vec<C> {
     type Component = C;
     type Dim = Dim1;
@@ -223,7 +230,7 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
 }
 
 
-/// Implementation of [`TensorBase`] for `ndarray::Array1`.
+/// Implementation of [`TensorBase`] for [`ndarray::Array1`].
 impl<C: TensorComponent> TensorBase for Array1<C> {
     type Component = C;
     type Dim = Dim1;
@@ -302,7 +309,7 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
 }
 
 
-/// Implementation of [`TensorBase`] for `ndarray::Array2`.
+/// Implementation of [`TensorBase`] for [`ndarray::Array2`].
 impl<C: TensorComponent> TensorBase for Array2<C> {
     type Component = C;
     type Dim = Dim2;
