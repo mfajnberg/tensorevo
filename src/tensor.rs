@@ -65,10 +65,11 @@ pub trait TensorBase:
 
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
-    /// Returns the sum of all rows (0) or columns (1) as a new tensor.
+    /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of a lower dimensionality.
     fn sum_axis<T>(&self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
+    /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of the same dimensionality.
     fn sum_axis_same_dim(&self, axis: usize) -> Self;
 
     fn insert_axis<T>(self, axis: usize) -> T
@@ -360,8 +361,15 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
 
     fn sum_axis<T>(&self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
-        let axis_sum_iterator = Array2::axis_iter(self, Axis(axis)).map(|subview| subview.sum());
-        T::from_iter(axis_sum_iterator, Array2::len_of(self, Axis(axis)))
+        let other_axis = if axis == 0 {
+            Axis(1)
+        } else if axis == 1 {
+            Axis(0)
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        let axis_sum_iterator = Array2::axis_iter(self, other_axis).map(|subview| subview.sum());
+        T::from_iter(axis_sum_iterator, Array2::len_of(self, other_axis))
     }
 
     fn sum_axis_same_dim(&self, axis: usize) -> Self {
