@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::component::TensorComponent;
-use crate::dimension::{Dim1, Dim2, Dimension, HasLowerDimension};
+use crate::dimension::{Dim1, Dim2, Dimension, HasHigherDimension, HasLowerDimension};
 use crate::ops::{Dot, Norm};
 
 
@@ -24,7 +24,7 @@ pub trait TensorBase:
     type Component: TensorComponent;
 
     /// The dimensionality/index type of the tensor.
-    type Dim: Dimension + HasLowerDimension;
+    type Dim: Dimension + HasHigherDimension + HasLowerDimension;
     
     /// Creates a tensor of the specified `shape` with all zero components.
     fn zeros(shape: impl Into<Self::Dim>) -> Self {
@@ -33,6 +33,12 @@ pub trait TensorBase:
     
     /// Creates a tensor of the specified `shape` with all components equal to `num`.
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self;
+
+    /// Creates a tensor of the specified `shape` from items from the provided `iterable`.
+    fn from_iter<I, S>(iterable: I, shape: S) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>,
+        S: Into<Self::Dim>;
 
     /// Returns the shape of the tensor as a tuple of unsigned integers.
     fn shape<S: From<Self::Dim>>(&self) -> S;
@@ -60,7 +66,11 @@ pub trait TensorBase:
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
     /// Returns the sum of all rows (0) or columns (1) as a new tensor.
-    fn sum_axis(&self, axis: usize) -> Self;
+    fn sum_axis<T>(&self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
+
+    fn insert_axis<T>(self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher>;
 }
 
 
@@ -138,6 +148,14 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         vec![num; shape.into()]
     }
 
+    fn from_iter<I, S>(iterable: I, shape: S) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>,
+        S: Into<Self::Dim>
+    {
+        iterable.into_iter().take(shape.into()).collect()
+    }
+
     fn shape<S: From<Self::Dim>>(&self) -> S {
         self.len().into()
     }
@@ -179,8 +197,21 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         <&'_ Vec<Self::Component>>::into_iter(self)
     }
 
-    fn sum_axis(&self, _axis: usize) -> Self {
-        vec![self.iter().copied().sum()]
+    fn sum_axis<T>(&self, _axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        T::from_num(self.iter().copied().sum(), ())
+    }
+
+    fn insert_axis<T>(self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher> {
+        let shape = if axis == 0 {
+            [1, self.len()]
+        } else if axis == 1 {
+            [self.len(), 1]
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        T::from_iter(self.iter().copied(), shape)
     }
 }
 
@@ -191,7 +222,15 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
     type Dim = Dim1;
 
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
-        Self::from_elem(shape.into(), num)
+        Array1::from_elem(shape.into(), num)
+    }
+
+    fn from_iter<I, S>(iterable: I, shape: S) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>,
+        S: Into<Self::Dim>
+    {
+        Array1::from_iter(iterable.into_iter().take(shape.into()))
     }
 
     fn shape<S: From<Self::Dim>>(&self) -> S {
@@ -233,8 +272,21 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
         Array1::<C>::iter(self)
     }
 
-    fn sum_axis(&self, axis: usize) -> Self {
-        Array1::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
+    fn sum_axis<T>(&self, _axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        T::from_num(Array1::sum(self), ())
+    }
+
+    fn insert_axis<T>(self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher> {
+        let shape = if axis == 0 {
+            [1, self.len()]
+        } else if axis == 1 {
+            [self.len(), 1]
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        T::from_iter(self.iter().copied(), shape)
     }
 }
 
@@ -245,7 +297,16 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
     type Dim = Dim2;
 
     fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
-        Self::from_elem(shape.into(), num)
+        Array2::from_elem(shape.into(), num)
+    }
+
+    fn from_iter<I, S>(iterable: I, shape: S) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>,
+        S: Into<Self::Dim>
+    {
+        let iterator: &mut dyn Iterator<Item = Self::Component> = &mut iterable.into_iter();
+        Array2::from_shape_simple_fn(shape.into(), || iterator.next().unwrap())
     }
 
     fn shape<S: From<Self::Dim>>(&self) -> S {
@@ -287,8 +348,25 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
         Array2::<C>::iter(self)
     }
 
-    fn sum_axis(&self, axis: usize) -> Self {
-        Array2::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
+    fn sum_axis<T>(&self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        let axis_sum_iterator = Array2::axis_iter(self, Axis(axis)).map(|subview| subview.sum());
+        T::from_iter(axis_sum_iterator, Array2::len_of(self, Axis(axis)))
+    }
+
+    fn insert_axis<T>(self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher> {
+        let (rows, cols) = Array2::dim(&self);
+        let shape = if axis == 0 {
+            [1, rows, cols]
+        } else if axis == 1 {
+            [rows, 1, cols]
+        } else if axis == 2 {
+            [rows, cols, 1]
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        T::from_iter(self.iter().copied(), shape)
     }
 }
 
@@ -385,14 +463,14 @@ mod tests {
                 [0., 1., 2.],
                 [3., 4., 5.]
             ];
-            let result = TensorBase::sum_axis(&tensor, 0);
-            let expected = array![[3., 5., 7.]];
+            let result: Array1<f64> = TensorBase::sum_axis(&tensor, 0);
+            let expected = array![3., 5., 7.];
             assert_eq!(result, expected);
 
-            let result = TensorBase::sum_axis(&tensor, 1);
+            let result: Array1<f64> = TensorBase::sum_axis(&tensor, 1);
             let expected = array![
-                [3. ],
-                [12.]
+                3. ,
+                12.
             ];
             assert_eq!(result, expected);
         }
