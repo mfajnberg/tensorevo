@@ -1,6 +1,8 @@
 // TODO: Documentation
 //       https://github.com/mfajnberg/tensorevo/issues/22
 
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 use crate::activation::Activation;
@@ -28,6 +30,13 @@ impl<T: Tensor> Layer<T> {
 
     pub fn size(&self) -> usize {
         self.weights.shape().0
+    }
+}
+
+
+impl<T: Tensor> Display for Layer<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Layer {{ size: {}, activation: {} }}", self.size(), self.activation.name())
     }
 }
 

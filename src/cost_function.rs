@@ -55,6 +55,11 @@ impl<T: TensorBase> CostFunction<T> {
     pub fn d(&self, output: &T, desired_output: &T) -> T {
         (self.derivative)(output, desired_output)
     }
+
+    /// Returns the name of the cost function.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 

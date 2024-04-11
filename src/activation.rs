@@ -54,6 +54,11 @@ impl<T: TensorBase> Activation<T> {
     pub fn d(&self, tensor: &T) -> T {
         (self.derivative)(tensor)
     }
+
+    /// Returns the name of the activation function.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 

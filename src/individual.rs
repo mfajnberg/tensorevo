@@ -2,7 +2,7 @@
 //!
 //! The `Individual` is the centerpiece of the evolutionary process.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::fs::read_to_string;
 use std::io::Error as IOError;
 use std::path::Path;
@@ -11,7 +11,6 @@ use std::slice::Iter;
 
 use log::trace;
 use num_traits::FromPrimitive;
-use serde_json;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -250,6 +249,23 @@ impl<T: Tensor> Individual<T> {
     /// The error value
     pub fn calculate_error(&self, input: &T, desired_output: &T) -> f32 {
         (self.cost_function)(&self(input), desired_output)
+    }
+}
+
+
+impl<T: Tensor> Display for Individual<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let indent = "  ";
+        let mut layers_display = format!("[\n{indent}");
+        let sep = format!(",\n{indent}");
+        layers_display.push_str(
+            &self.layers.iter()
+                        .map(|layer| layer.to_string())
+                        .collect::<Vec<String>>()
+                        .join(&sep)
+        );
+        layers_display.push_str("\n]");
+        write!(f, "Individual {{ layers: {}, cost_function: {} }}", layers_display, self.cost_function.name())
     }
 }
 
