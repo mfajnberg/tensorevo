@@ -3,13 +3,13 @@
 use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use ndarray::{Array1, Array2, ArrayView, Axis};
+use ndarray::{Array1, Array2, Array3, ArrayView, Axis};
 use num_traits::FromPrimitive;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::component::TensorComponent;
-use crate::dimension::{Dim1, Dim2, Dimension, HasHigherDimension, HasLowerDimension};
+use crate::dimension::{Dim1, Dim2, Dim3, Dimension, HasHigherDimension, HasLowerDimension};
 use crate::ops::{Dot, Norm};
 
 
@@ -53,6 +53,8 @@ pub trait TensorBase:
     fn as_slice(&self) -> &[Self::Component];
 
     /// Append a `tensor` of lower dimensionality along the specified `axis`.
+    ///
+    /// Panics if `axis` is out of bounds.
     fn append<T>(&mut self, axis: usize, tensor: &T)
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
@@ -74,13 +76,19 @@ pub trait TensorBase:
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
 
     /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of a lower dimensionality.
+    ///
+    /// Panics if `axis` is out of bounds.
     fn sum_axis<T>(&self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
 
     /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of the same dimensionality.
+    ///
+    /// Panics if `axis` is out of bounds.
     fn sum_axis_same_dim(&self, axis: usize) -> Self;
 
     /// Transforms the tensor into one with an additional axis/dimension.
+    ///
+    /// Panics if `axis` is out of bounds.
     fn insert_axis<T>(self, axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher>;
 }
@@ -396,6 +404,117 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
             panic!("Axis {axis} out of bounds!")
         };
         T::from_iter(self.iter().copied(), shape)
+    }
+}
+
+
+/// Implementation of [`TensorBase`] for [`ndarray::Array3`].
+impl<C: TensorComponent> TensorBase for Array3<C> {
+    type Component = C;
+    type Dim = Dim3;
+
+    fn from_num(num: Self::Component, shape: impl Into<Self::Dim>) -> Self {
+        Array3::from_elem(shape.into(), num)
+    }
+
+    fn from_iter<I, S>(iterable: I, shape: S) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>,
+        S: Into<Self::Dim>
+    {
+        let iterator: &mut dyn Iterator<Item = Self::Component> = &mut iterable.into_iter();
+        Array3::from_shape_simple_fn(shape.into(), || iterator.next().unwrap())
+    }
+
+    fn shape<S: From<Self::Dim>>(&self) -> S {
+        S::from(self.dim().into())
+    }
+    
+    fn transpose(&self) -> Self {
+        self.t().to_owned()
+    }
+
+    fn as_slice(&self) -> &[Self::Component] {
+        Array3::as_slice(self).unwrap()
+    }
+
+    fn append<T>(&mut self, axis: usize, tensor: &T)
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array3::push(
+            self,
+            Axis(axis),
+            ArrayView::from_shape(
+                tensor.shape::<Dim2>(),
+                tensor.as_slice()
+            ).unwrap()
+        ).unwrap()
+    }
+
+    fn map<F>(&self, f: F) -> Self
+    where F: FnMut(C) -> C {
+        self.mapv(f)
+    }
+
+    fn map_inplace<F>(&mut self, f: F)
+    where F: FnMut(C) -> C {
+        self.mapv_inplace(f)
+    }
+
+    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
+        Array3::<C>::indexed_iter(self).map(|(idx, component)| (IDX::from(idx.into()), component))
+    }
+
+    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
+        Array3::<C>::indexed_iter_mut(self).map(|(idx, component)| (IDX::from(idx.into()), component))
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Self::Component> {
+        Array3::<C>::iter(self)
+    }
+
+    fn sum_axis<T>(&self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        // Determine the shape of the resulting 2-dimensional tensor.
+        let (x, y, z) = self.dim();
+        let mut result = if axis == 0 {
+            T::zeros((y, z))
+        } else if axis == 1 {
+            T::zeros((x, z))
+        } else if axis == 2 {
+            T::zeros((x, y))
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        // Look at each subview (matrix) along the specified axis.
+        // Their shapes should all be equal to the shape of the result matrix.
+        for subview in Array3::axis_iter(self, Axis(axis)) {
+            // Add components in the same row and column along the specified axis.
+            for ((row, col), component) in result.indexed_iter_mut() {
+                *component += subview[[row, col]]
+            }
+        }
+        result
+    }
+
+    fn sum_axis_same_dim(&self, axis: usize) -> Self {
+        Array3::sum_axis(self, Axis(axis)).insert_axis(Axis(axis))
+    }
+
+    fn insert_axis<T>(self, axis: usize) -> T
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasHigherDimension>::Higher> {
+        let (x, y, z) = Array3::dim(&self);
+        let new_shape = if axis == 0 {
+            [1, x, y, z]
+        } else if axis == 1 {
+            [x, 1, y, z]
+        } else if axis == 2 {
+            [x, y, 1, z]
+        } else if axis == 3 {
+            [x, y, z, 1]
+        } else {
+            panic!("Axis {axis} out of bounds!")
+        };
+        T::from_iter(self.iter().copied(), new_shape)
     }
 }
 
