@@ -36,11 +36,11 @@ pub fn random_individual<T: Tensor2, R: Clone + SampleRange<usize>>(
             rng.gen_range(neurons_per_layer.clone())
         };
         let mut weights = T::zeros((num_neurons, num_neurons_previous));
-        for ((_, _), weight) in weights.iter_indexed_mut() {
+        for weight in weights.iter_mut() {
             *weight = init_weight(rng, true).unwrap();
         }
         let mut biases = T::zeros((num_neurons, 1));
-        for ((_, _), bias) in biases.iter_indexed_mut() {
+        for bias in biases.iter_mut() {
             *bias = init_weight(rng, true).unwrap();
         }
         layers.push(

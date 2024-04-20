@@ -62,7 +62,11 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
     }
 
     fn iter(&self) -> impl Iterator<Item = &Self::Component> {
-        <&'_ Vec<Self::Component>>::into_iter(self)
+        self[..].iter()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
+        self[..].iter_mut()
     }
 
     fn sum_axis<T>(&self, _axis: usize) -> T
@@ -144,6 +148,10 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
         Array1::<C>::iter(self)
     }
 
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
+        Array1::<C>::iter_mut(self)
+    }
+
     fn sum_axis<T>(&self, _axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
         T::from_num(Array1::sum(self), ())
@@ -222,6 +230,10 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
 
     fn iter(&self) -> impl Iterator<Item = &Self::Component> {
         Array2::<C>::iter(self)
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
+        Array2::<C>::iter_mut(self)
     }
 
     fn sum_axis<T>(&self, axis: usize) -> T
@@ -320,6 +332,10 @@ impl<C: TensorComponent> TensorBase for Array3<C> {
 
     fn iter(&self) -> impl Iterator<Item = &Self::Component> {
         Array3::<C>::iter(self)
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
+        Array3::<C>::iter_mut(self)
     }
 
     fn sum_axis<T>(&self, axis: usize) -> T
