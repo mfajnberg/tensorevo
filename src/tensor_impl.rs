@@ -53,11 +53,11 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         *self = self.map(f);
     }
 
-    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
+    fn iter_indexed<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
         <&'_ Vec<Self::Component>>::into_iter(self).enumerate().map(|(idx, component)| (idx.into(), component))
     }
 
-    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
+    fn iter_indexed_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
         <&'_ mut Vec<Self::Component>>::into_iter(self).enumerate().map(|(idx, component)| (idx.into(), component))
     }
 
@@ -132,11 +132,11 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
         self.mapv_inplace(f)
     }
 
-    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
+    fn iter_indexed<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
         Array1::<C>::indexed_iter(self).map(|(idx, component)| (idx.into(), component))
     }
 
-    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
+    fn iter_indexed_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
         Array1::<C>::indexed_iter_mut(self).map(|(idx, component)| (idx.into(), component))
     }
 
@@ -212,11 +212,11 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
         self.mapv_inplace(f)
     }
 
-    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
+    fn iter_indexed<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
         Array2::<C>::indexed_iter(self).map(|(idx, component)| (IDX::from(idx.into()), component))
     }
 
-    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
+    fn iter_indexed_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
         Array2::<C>::indexed_iter_mut(self).map(|(idx, component)| (IDX::from(idx.into()), component))
     }
 
@@ -310,11 +310,11 @@ impl<C: TensorComponent> TensorBase for Array3<C> {
         self.mapv_inplace(f)
     }
 
-    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
+    fn iter_indexed<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)> {
         Array3::<C>::indexed_iter(self).map(|(idx, component)| (IDX::from(idx.into()), component))
     }
 
-    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
+    fn iter_indexed_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)> {
         Array3::<C>::indexed_iter_mut(self).map(|(idx, component)| (IDX::from(idx.into()), component))
     }
 
@@ -339,7 +339,7 @@ impl<C: TensorComponent> TensorBase for Array3<C> {
         // Their shapes should all be equal to the shape of the result matrix.
         for subview in Array3::axis_iter(self, Axis(axis)) {
             // Add components in the same row and column along the specified axis.
-            for ((row, col), component) in result.indexed_iter_mut() {
+            for ((row, col), component) in result.iter_indexed_mut() {
                 *component += subview[[row, col]]
             }
         }

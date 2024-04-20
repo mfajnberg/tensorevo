@@ -66,10 +66,10 @@ pub trait TensorBase:
     where F: FnMut(Self::Component) -> Self::Component;
 
     /// Return an iterator of indexes and references to the components of the tensor.
-    fn indexed_iter<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)>;
+    fn iter_indexed<IDX: From<Self::Dim>>(&self) -> impl Iterator<Item = (IDX, &Self::Component)>;
 
     /// Return an iterator of indexes and mutable references to the components of the tensor.
-    fn indexed_iter_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)>;
+    fn iter_indexed_mut<IDX: From<Self::Dim>>(&mut self) -> impl Iterator<Item = (IDX, &mut Self::Component)>;
 
     /// Returns an iterator of references to the components of the tensor (in logical order).
     fn iter(&self) -> impl Iterator<Item = &Self::Component>;
