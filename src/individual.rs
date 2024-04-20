@@ -15,9 +15,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::layer::Layer;
-use crate::tensor::Tensor2;
 use crate::cost_function::CostFunction;
+use crate::dimension::HasHigherDimension;
+use crate::layer::Layer;
+use crate::tensor::{Tensor2, TensorBase};
 
 #[cfg(test)]
 use mocktopus::macros::*;
@@ -219,23 +220,40 @@ impl<T: Tensor2> Individual<T> {
     /// Also updates the individual's error, if validation data is passed in as well.
     ///
     /// # Arguments
-    /// * `training_data` - Vector of tuples of two Tensors each, where the first one is a batch of inputs,
-    ///                     and the second one is a corresponding batch of output data.
+    /// * `training_data` - 2-tuple of 3D-Tensors, where the first one holds batches of inputs
+    ///                     along its 0-th axis and the second one holds corresponding batches of
+    ///                     desired outputs along its 0-th axis. In both, the samples within each
+    ///                     batch are laid out along the 2-nd axis. Consequently, the tensors must
+    ///                     be equal in length along those two axes. The length of the 1-st axis in
+    ///                     the input tensor must then be equal to the number of inputs (i.e. input
+    ///                     neurons) of the network, while the length of the 1-st axis in the
+    ///                     tensor of desired outputs must be equal to the number of outputs
+    ///                     (i.e. output neurons).
+    /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     /// * `validation_data` - An optional tuple of validation inputs and outputs passed onward to 
     ///                       `stochastic_gradient_descent_step`
-    /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
-    pub fn stochastic_gradient_descent(
+    ///
+    /// TODO: Write something like a `TrainingConfig` struct to encapsulate learning rate,
+    ///       validation, etc. in a single parameter.
+    pub fn stochastic_gradient_descent<T3>(
         &mut self,
-        training_data: Vec<(&T, &T)>,
+        training_data: (&T3, &T3),
         learning_rate: f32,
         validation_data: Option<(&T, &T)>,
-    ) {
-        let (_, batch_size) = training_data[0].0.shape();
+    )
+    where
+        T3: TensorBase<
+            Component = T::Component,
+            Dim = <T::Dim as HasHigherDimension>::Higher,
+        >
+    {
+        let (num_batches, _, batch_size) = training_data.0.shape();
         let update_factor = T::Component::from_f32(learning_rate / batch_size as f32).unwrap();
-        let num_batches = training_data.len();
-        for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
+        let input_iter = training_data.0.iter_axis(0);
+        let desired_output_iter = training_data.1.iter_axis(0);
+        for (i, (batch_inputs, batch_desired_outputs)) in input_iter.zip(desired_output_iter).enumerate() {
             trace!("batch: {}/{}", i+1, num_batches);
-            self.stochastic_gradient_descent_step(batch_inputs, batch_desired_outputs, update_factor, validation_data);
+            self.stochastic_gradient_descent_step(&batch_inputs, &batch_desired_outputs, update_factor, validation_data);
         }
     }
 
@@ -385,7 +403,6 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, Registered};
-    use crate::cost_function::CostFunction;
 
     type T = Array2<f64>;
 
