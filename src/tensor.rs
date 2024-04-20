@@ -77,6 +77,14 @@ pub trait TensorBase:
     /// Returns an iterator of mutable references to the components of the tensor (in logical order).
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component>;
 
+    /// Returns an iterator of sub-tensors along the specified `axis`.
+    ///
+    /// Panics if `axis` is out of bounds.
+    ///
+    /// TODO: Make this return an iterator of references instead.
+    fn iter_axis<T>(&self, axis: usize) -> impl Iterator<Item = T>
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower>;
+
     /// Returns the sum of all sub-tensors along the specified `axis` as a new tensor of a lower dimensionality.
     ///
     /// Panics if `axis` is out of bounds.

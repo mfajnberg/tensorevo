@@ -69,6 +69,14 @@ impl<C: TensorComponent> TensorBase for Vec<C> {
         self[..].iter_mut()
     }
 
+    fn iter_axis<T>(&self, axis: usize) -> impl Iterator<Item = T>
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        if axis != 0 {
+            panic!("Axis {axis} out of bounds!")
+        }
+        self.iter().map(|component| T::from_num(*component, ()))
+    }
+
     fn sum_axis<T>(&self, _axis: usize) -> T
     where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
         T::from_num(self.iter().copied().sum(), ())
@@ -150,6 +158,12 @@ impl<C: TensorComponent> TensorBase for Array1<C> {
 
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
         Array1::<C>::iter_mut(self)
+    }
+
+    fn iter_axis<T>(&self, axis: usize) -> impl Iterator<Item = T>
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array1::<C>::axis_iter(self, Axis(axis))
+                    .map(|subview| T::from_iter(subview.iter().map(|c| *c), subview.dim()))
     }
 
     fn sum_axis<T>(&self, _axis: usize) -> T
@@ -234,6 +248,12 @@ impl<C: TensorComponent> TensorBase for Array2<C> {
 
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
         Array2::<C>::iter_mut(self)
+    }
+
+    fn iter_axis<T>(&self, axis: usize) -> impl Iterator<Item = T>
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array2::<C>::axis_iter(self, Axis(axis))
+                    .map(|subview| T::from_iter(subview.iter().map(|c| *c), subview.dim()))
     }
 
     fn sum_axis<T>(&self, axis: usize) -> T
@@ -336,6 +356,12 @@ impl<C: TensorComponent> TensorBase for Array3<C> {
 
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Component> {
         Array3::<C>::iter_mut(self)
+    }
+
+    fn iter_axis<T>(&self, axis: usize) -> impl Iterator<Item = T>
+    where T: TensorBase<Component = Self::Component, Dim = <Self::Dim as HasLowerDimension>::Lower> {
+        Array3::<C>::axis_iter(self, Axis(axis))
+                    .map(|subview| T::from_iter(subview.iter().map(|c| *c), subview.dim()))
     }
 
     fn sum_axis<T>(&self, axis: usize) -> T
