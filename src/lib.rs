@@ -12,6 +12,7 @@ pub mod individual;
 pub mod layer;
 pub mod ops;
 pub mod tensor;
+pub mod tensor_impl;
 pub mod utils;
 pub mod world;
 
