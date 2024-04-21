@@ -104,7 +104,6 @@ pub trait TensorBase:
 }
 
 
-/// Calculate norms of a tensor.
 /// [`TensorBase`] combined with basic mathematical operations.
 pub trait TensorOp =
 where 

@@ -4,6 +4,7 @@ use num_traits::real::Real;
 use crate::component::TensorComponent;
 
 
+/// Calculate norms of a tensor.
 pub trait Norm {
     /// Output type of any norm method.
     type Output: TensorComponent;
