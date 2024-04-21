@@ -2,7 +2,7 @@ use ordered_float::OrderedFloat;
 use rand::distributions::Slice;
 use rand::{Rng, thread_rng};
 
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 use crate::world::World;
 
 
@@ -19,7 +19,7 @@ use crate::world::World;
 ///
 /// # Returns:
 /// Vector of 2-tuples of indices of the individuals in the specified species that should procreate.
-pub fn select<T: Tensor>(world: &mut World<T>, species_key: &str) -> Vec<(usize, usize)> {
+pub fn select<T: Tensor2>(world: &mut World<T>, species_key: &str) -> Vec<(usize, usize)> {
     // Sort individuals in species by validation error.
     let individuals = world.species.get_mut(species_key).unwrap();
     let (input, desired_output) = &world.validation_data;

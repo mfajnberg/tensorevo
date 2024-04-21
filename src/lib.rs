@@ -6,10 +6,13 @@
 pub mod activation;
 pub mod component;
 pub mod cost_function;
+pub mod dimension;
 pub mod evolution;
 pub mod individual;
 pub mod layer;
+pub mod ops;
 pub mod tensor;
+pub mod tensor_impl;
 pub mod utils;
 pub mod world;
 

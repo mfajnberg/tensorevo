@@ -2,10 +2,11 @@ use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 
 use crate::evolution::init::init_weight;
-use crate::tensor::Tensor;
+use crate::dimension::Dim2;
+use crate::tensor::TensorBase;
 
 
-pub fn crossover_layer_weights<T: Tensor>(
+pub fn crossover_layer_weights<T: TensorBase<Dim = Dim2>>(
     new_weights: &mut T,
     weights_p1: &T,
     weights_p2: &T,
@@ -13,7 +14,7 @@ pub fn crossover_layer_weights<T: Tensor>(
 ) {
     let (rows_p1, cols_p1) = weights_p1.shape();
     let (rows_p2, cols_p2) = weights_p2.shape();
-    for ((row, col), component) in new_weights.indexed_iter_mut() {
+    for ((row, col), component) in new_weights.iter_indexed_mut() {
         // both parents have a component at row|col
         if row < rows_p1 && col < cols_p1 && row < rows_p2 && col < cols_p2 {
             let weight_p1 = weights_p1[[row, col]];
@@ -36,15 +37,15 @@ pub fn crossover_layer_weights<T: Tensor>(
 }
 
 
-pub fn crossover_layer_biases<T: Tensor>(
+pub fn crossover_layer_biases<T: TensorBase<Dim = Dim2>>(
     new_biases: &mut T,
     biases_p1: &T,
     biases_p2: &T,
     rng: &mut ThreadRng,
 ) {
-    let rows_p1 = biases_p1.shape().0;
-    let rows_p2 = biases_p2.shape().0;
-    for ((row, _), component) in new_biases.indexed_iter_mut() {
+    let (rows_p1, _) = biases_p1.shape();
+    let (rows_p2, _) = biases_p2.shape();
+    for ((row, _), component) in new_biases.iter_indexed_mut() {
         // both parents have a component at row
         if rows_p1 > row && rows_p2 > row {
             let bias_p1 = biases_p1[[row, 0]];

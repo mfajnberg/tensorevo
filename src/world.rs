@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::individual::Individual;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 
 
 type SelectFunc<T> = fn(&mut World<T>, &str) -> Vec<(usize, usize)>;
@@ -9,7 +9,7 @@ type ProcreateFunc<T> = fn(&Individual<T>, &Individual<T>) -> Individual<T>;
 type DetermineSpeciesKey<T> = fn(&Individual<T>) -> String;
 
 
-pub struct World<T: Tensor> {
+pub struct World<T: Tensor2> {
     pub species: HashMap<String, Vec<Individual<T>>>,
     kill_weak_and_select_parents: SelectFunc<T>,
     procreate_pair: ProcreateFunc<T>, // crossover, mutation
@@ -18,7 +18,7 @@ pub struct World<T: Tensor> {
 }
 
 
-impl<T: Tensor> World<T> {
+impl<T: Tensor2> World<T> {
     pub fn new(
         kill_weak_and_select_parents: SelectFunc<T>,
         procreate_pair: ProcreateFunc<T>,

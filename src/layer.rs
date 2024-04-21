@@ -6,18 +6,18 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::activation::Activation;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
-pub struct Layer<T: Tensor> {
+pub struct Layer<T: Tensor2> {
     pub weights: T,
     pub biases: T,
     pub activation: Activation<T>
 }
 
-impl<T: Tensor> Layer<T> {
+impl<T: Tensor2> Layer<T> {
     pub fn new(weights: T, biases: T, activation: Activation<T>) -> Self {
         Self { weights, biases, activation }
     }
@@ -29,19 +29,19 @@ impl<T: Tensor> Layer<T> {
     }
 
     pub fn size(&self) -> usize {
-        self.weights.shape().0
+        self.weights.shape::<(usize, usize)>().0
     }
 }
 
 
-impl<T: Tensor> Display for Layer<T> {
+impl<T: Tensor2> Display for Layer<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Layer {{ size: {}, activation: {} }}", self.size(), self.activation.name())
     }
 }
 
 
-impl<T: Tensor> FnOnce<(&T,)> for Layer<T> {
+impl<T: Tensor2> FnOnce<(&T,)> for Layer<T> {
     type Output = T;
 
     extern "rust-call" fn call_once(self, args: (&T,)) -> Self::Output {
@@ -50,14 +50,14 @@ impl<T: Tensor> FnOnce<(&T,)> for Layer<T> {
 }
 
 
-impl<T: Tensor> FnMut<(&T,)> for Layer<T> {
+impl<T: Tensor2> FnMut<(&T,)> for Layer<T> {
     extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
         self.feed_forward(args.0).1
     }
 }
 
 
-impl<T: Tensor> Fn<(&T,)> for Layer<T> {
+impl<T: Tensor2> Fn<(&T,)> for Layer<T> {
     extern "rust-call" fn call(&self, args: (&T,)) -> Self::Output {
         self.feed_forward(args.0).1
     }
@@ -71,12 +71,12 @@ mod tests {
 
     use super::*;
 
-    fn double<T: Tensor>(t: &T) -> T {
+    fn double<T: Tensor2>(t: &T) -> T {
         t + t
     }
 
-    fn twos<T: Tensor>(t: &T) -> T {
-        let ones = T::from_num(T::Component::one(), t.shape());
+    fn twos<T: Tensor2>(t: &T) -> T {
+        let ones = T::from_num(T::Component::one(), t.shape::<(usize, usize)>());
         &ones + &ones
     }
 

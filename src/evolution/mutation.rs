@@ -5,11 +5,11 @@ use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Poisson};
 
 use crate::evolution::init::init_weight;
-use crate::tensor::Tensor;
+use crate::tensor::Tensor2;
 use crate::layer::Layer;
 
 
-pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
+pub fn mutate_add_layer<T: Tensor2>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadRng) {
     if !should_add_layer(layers.len(), rng) { return; }
 
     let new_layer_idx = rng.gen_range(1..=layers.len());
@@ -35,12 +35,12 @@ pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadR
     // = non-zero entries in weight matrix of following layer BEFORE mutation
     let zero_component = T::Component::zero();
     let new_weights_num_rows = following_layer.weights.iter().filter(|&weight| *weight != zero_component).count();
-    let mut new_weights = T::zeros((new_weights_num_rows, following_weights_num_cols));
+    let mut new_weights = T::zeros([new_weights_num_rows, following_weights_num_cols]);
     // modified following weight matrix:
     // rows unchanged, columns = rows in new layer's weight matrix
-    let mut following_weights = T::zeros((following_weights_num_rows, new_weights_num_rows));
+    let mut following_weights = T::zeros([following_weights_num_rows, new_weights_num_rows]);
     let mut connection_idx = 0;
-    following_layer.weights.indexed_iter().for_each(
+    following_layer.weights.iter_indexed().for_each(
         |((row_idx, col_idx), weight)| if *weight != zero_component {
             new_weights[[connection_idx, col_idx]] = T::Component::one();
             following_weights[[row_idx, connection_idx]] = *weight;
@@ -48,7 +48,7 @@ pub fn mutate_add_layer<T: Tensor>(layers: &mut Vec<Layer<T>>, rng: &mut ThreadR
         }
     );
     following_layer.weights = following_weights;
-    let new_biases = T::zeros((new_weights_num_rows, 1));
+    let new_biases = T::zeros([new_weights_num_rows, 1]);
     let new_layer = Layer::new(new_weights, new_biases, following_layer.activation.clone());
     layers.insert(new_layer_idx, new_layer);
 }
@@ -61,7 +61,7 @@ fn should_add_layer(num_layers: usize, rng: &mut ThreadRng) -> bool {
 
 
 /// Randomly adds new connections between existing neurons.
-pub fn mutate_add_connections<T: Tensor>(layers: &mut [Layer<T>], rng: &mut ThreadRng) {
+pub fn mutate_add_connections<T: Tensor2>(layers: &mut [Layer<T>], rng: &mut ThreadRng) {
     let neuron_index_lookup = get_neuron_index_lookup(layers);
     let total_size = neuron_index_lookup.len();
     // Decide how many new connections to create.
@@ -72,7 +72,7 @@ pub fn mutate_add_connections<T: Tensor>(layers: &mut [Layer<T>], rng: &mut Thre
 
 
 /// Returns a vector that maps "global" neuron index to 2-tuple of layer index and "in-layer" neuron index.
-fn get_neuron_index_lookup<T: Tensor>(layers: &[Layer<T>]) -> Vec<(usize, usize)> {
+fn get_neuron_index_lookup<T: Tensor2>(layers: &[Layer<T>]) -> Vec<(usize, usize)> {
     let size = layers.iter().map(|layer| layer.size()).sum();
     let mut neuron_index_lookup = Vec::with_capacity(size);
     for (layer_idx, layer) in layers.iter().enumerate() {
@@ -85,7 +85,7 @@ fn get_neuron_index_lookup<T: Tensor>(layers: &[Layer<T>]) -> Vec<(usize, usize)
 
 
 /// Randomly chooses a start and end of a new connection.
-fn choose_new_connection<T: Tensor>(
+fn choose_new_connection<T: Tensor2>(
     layers: &[Layer<T>],
     total_size: usize,
     neuron_index_lookup: &[(usize, usize)],
@@ -110,7 +110,7 @@ fn choose_new_connection<T: Tensor>(
 
 
 /// Creates new connections and possibly neurons in between.
-fn add_new_connection<T: Tensor>(
+fn add_new_connection<T: Tensor2>(
     layers: &mut [Layer<T>],
     total_size: usize,
     neuron_index_lookup: &[(usize, usize)],
@@ -123,16 +123,18 @@ fn add_new_connection<T: Tensor>(
         // The row is all zeros except for the column corresponding to the neuron connected to
         // it from the previous layer.
         let weights = &mut layers[layer_idx].weights;
-        let mut new_row = vec![T::Component::zero(); weights.shape().1];
+        let (num_rows, num_cols) = weights.shape();
+        let mut new_row = vec![T::Component::zero(); num_cols];
         new_row[prev_neuron_idx] = T::Component::one();
-        weights.append_row(new_row.as_slice());
+        weights.append(0, &new_row);
         // Remember the index of the new neuron for the next iteration.
-        prev_neuron_idx = weights.shape().0 - 1;
+        prev_neuron_idx = num_rows;
         // Append a zero to the bias vector.
-        layers[layer_idx].biases.append_row(vec![T::Component::zero()].as_slice());
+        layers[layer_idx].biases.append(0, &vec![T::Component::zero()]);
         // Append a column to the next layer's weight matrix with all zeros.
         let weights = &mut layers[layer_idx + 1].weights;
-        weights.append_column(vec![T::Component::zero(); weights.shape().0].as_slice());
+        let (num_rows, _) = weights.shape();
+        weights.append(1, &vec![T::Component::zero(); num_rows]);
     }
     layers[end_layer_idx].weights[[end_neuron_idx, prev_neuron_idx]] = init_weight(rng, false).unwrap();
 }

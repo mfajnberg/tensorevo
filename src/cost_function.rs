@@ -111,7 +111,7 @@ impl<T: TensorBase> FnMut<(&T, &T)> for CostFunction<T> {
 /// }
 ///
 /// fn zero_derivative<T: TensorBase>(t1: &T, _t2: &T) -> T {
-///     T::zeros(t1.shape())
+///     T::zeros(t1.shape::<T::Dim>())
 /// }
 ///
 /// fn main() {
@@ -143,7 +143,7 @@ impl<T: 'static + TensorOp> Serialize for CostFunction<T> {
 
 /// Allows [`serde`] to deserialize to [`CostFunction`] objects.
 impl<'de, T: 'static + TensorOp> Deserialize<'de> for CostFunction<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<DE: Deserializer<'de>>(deserializer: DE) -> Result<Self, DE::Error> {
         Registered::deserialize_from_key(deserializer)
     }
 }

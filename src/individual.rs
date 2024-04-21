@@ -15,9 +15,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::layer::Layer;
-use crate::tensor::Tensor;
 use crate::cost_function::CostFunction;
+use crate::dimension::HasHigherDimension;
+use crate::layer::Layer;
+use crate::tensor::{Tensor2, TensorBase};
 
 #[cfg(test)]
 use mocktopus::macros::*;
@@ -35,7 +36,7 @@ fn generate_uuid_v4() -> u128 {
 /// (See [`Fn` implementation](#impl-Fn<(%26T,)>-for-Individual<T>) below.)
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[serde(bound = "")]
-pub struct Individual<T: Tensor> {
+pub struct Individual<T: Tensor2> {
     /// Unique identifier.
     id: u128,
 
@@ -59,7 +60,7 @@ pub enum LoadError {
 }
 
 
-impl<T: Tensor> Individual<T> {
+impl<T: Tensor2> Individual<T> {
     /// Constructs a new individual from a vector of layers.
     ///
     /// # Arguments
@@ -166,7 +167,7 @@ impl<T: Tensor> Individual<T> {
         let delta = cost_derivative * activation_derivative;
         // Calculate and add the last layer's gradient components first.
         nabla_weights.push(delta.dot(activations[num_layers - 2].transpose()));
-        nabla_biases.push(delta.sum_axis(1));
+        nabla_biases.push(delta.sum_axis_same_dim(1));
         // Loop over the remaining layer indices in reverse order,
         // i.e. starting with the second to last index (`num_layers - 2`) and ending with `0`.
         for layer_num in (0..num_layers - 1).rev() {
@@ -180,7 +181,7 @@ impl<T: Tensor> Individual<T> {
             let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
             // Calculate and add the layer's gradient components.
             nabla_weights.push(delta.dot(previous_activation.transpose()));
-            nabla_biases.push(delta.sum_axis(1));
+            nabla_biases.push(delta.sum_axis_same_dim(1));
         }
         (nabla_weights, nabla_biases)
     }
@@ -205,9 +206,9 @@ impl<T: Tensor> Individual<T> {
         let (nabla_weights, nabla_biases) = self.backprop(input, desired_output);
         let gradients = nabla_weights.iter().zip(&nabla_biases).rev();
         for (idx, (nw, nb)) in gradients.enumerate() {
-            let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape());
+            let weights_update_factor = T::from_num(update_factor, self.layers[idx].weights.shape::<[usize; 2]>());
             self.layers[idx].weights -= &(weights_update_factor * nw);
-            let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape());
+            let biases_update_factor = T::from_num(update_factor, self.layers[idx].biases.shape::<[usize; 2]>());
             self.layers[idx].biases -= &(biases_update_factor * nb);
         }
         if let Some((input, desired_output)) = validation_data {
@@ -219,23 +220,40 @@ impl<T: Tensor> Individual<T> {
     /// Also updates the individual's error, if validation data is passed in as well.
     ///
     /// # Arguments
-    /// * `training_data` - Vector of tuples of two Tensors each, where the first one is a batch of inputs,
-    ///                     and the second one is a corresponding batch of output data.
+    /// * `training_data` - 2-tuple of 3D-Tensors, where the first one holds batches of inputs
+    ///                     along its 0-th axis and the second one holds corresponding batches of
+    ///                     desired outputs along its 0-th axis. In both, the samples within each
+    ///                     batch are laid out along the 2-nd axis. Consequently, the tensors must
+    ///                     be equal in length along those two axes. The length of the 1-st axis in
+    ///                     the input tensor must then be equal to the number of inputs (i.e. input
+    ///                     neurons) of the network, while the length of the 1-st axis in the
+    ///                     tensor of desired outputs must be equal to the number of outputs
+    ///                     (i.e. output neurons).
+    /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
     /// * `validation_data` - An optional tuple of validation inputs and outputs passed onward to 
     ///                       `stochastic_gradient_descent_step`
-    /// * `learning_rate` - Determines the rate of change to the individual's weights and biases during training.
-    pub fn stochastic_gradient_descent(
+    ///
+    /// TODO: Write something like a `TrainingConfig` struct to encapsulate learning rate,
+    ///       validation, etc. in a single parameter.
+    pub fn stochastic_gradient_descent<T3>(
         &mut self,
-        training_data: Vec<(&T, &T)>,
+        training_data: (&T3, &T3),
         learning_rate: f32,
         validation_data: Option<(&T, &T)>,
-    ) {
-        let (_, batch_size) = training_data[0].0.shape();
+    )
+    where
+        T3: TensorBase<
+            Component = T::Component,
+            Dim = <T::Dim as HasHigherDimension>::Higher,
+        >
+    {
+        let (num_batches, _, batch_size) = training_data.0.shape();
         let update_factor = T::Component::from_f32(learning_rate / batch_size as f32).unwrap();
-        let num_batches = training_data.len();
-        for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
+        let input_iter = training_data.0.iter_axis(0);
+        let desired_output_iter = training_data.1.iter_axis(0);
+        for (i, (batch_inputs, batch_desired_outputs)) in input_iter.zip(desired_output_iter).enumerate() {
             trace!("batch: {}/{}", i+1, num_batches);
-            self.stochastic_gradient_descent_step(batch_inputs, batch_desired_outputs, update_factor, validation_data);
+            self.stochastic_gradient_descent_step(&batch_inputs, &batch_desired_outputs, update_factor, validation_data);
         }
     }
 
@@ -253,7 +271,7 @@ impl<T: Tensor> Individual<T> {
 }
 
 
-impl<T: Tensor> Display for Individual<T> {
+impl<T: Tensor2> Display for Individual<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let indent = "  ";
         let mut layers_display = format!("[\n{indent}");
@@ -274,7 +292,7 @@ impl<T: Tensor> Display for Individual<T> {
 ///
 /// This is mainly implemented because [`FnOnce`] is a supertrait of [`Fn`].
 /// (See [`Individual::call`].)
-impl<T: Tensor> FnOnce<(&T,)> for Individual<T> {
+impl<T: Tensor2> FnOnce<(&T,)> for Individual<T> {
     type Output = T;
 
     /// See [`Individual::call`].
@@ -288,7 +306,7 @@ impl<T: Tensor> FnOnce<(&T,)> for Individual<T> {
 ///
 /// This is mainly implemented because [`FnMut`] is a supertrait of [`Fn`].
 /// (See [`Individual::call`].)
-impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
+impl<T: Tensor2> FnMut<(&T,)> for Individual<T> {
     /// See [`Individual::call`].
     extern "rust-call" fn call_mut(&mut self, args: (&T,)) -> Self::Output {
         self.layers.iter().fold(args.0.clone(), |output, layer| layer(&output))
@@ -338,11 +356,11 @@ impl<T: Tensor> FnMut<(&T,)> for Individual<T> {
 /// let output = individual(&input);
 /// assert_eq!(output, expected_output);
 /// ```
-impl<T: Tensor> Fn<(&T,)> for Individual<T> {
+impl<T: Tensor2> Fn<(&T,)> for Individual<T> {
     /// Performs a full forward pass for a given input and returns the network's output.
     ///
     /// # Arguments
-    /// * `input` - [Tensor] with a shape that matches the input layer.
+    /// * `input` - [Tensor2] with a shape that matches the input layer.
     ///
     /// # Returns
     /// Output tensor returned from the last layer
@@ -355,7 +373,7 @@ impl<T: Tensor> Fn<(&T,)> for Individual<T> {
 /// Allows access to layers by index.
 /// 
 /// Index 0 corresponds to the first hidden layer.
-impl<T: Tensor> Index<usize> for Individual<T> {
+impl<T: Tensor2> Index<usize> for Individual<T> {
     type Output = Layer<T>;
 
     fn index(&self, idx: usize) -> &Self::Output {
@@ -365,7 +383,7 @@ impl<T: Tensor> Index<usize> for Individual<T> {
 
 
 /// Allows turning a reference to an `Individual` into an iterator over [`Layer`] references.
-impl<'a, T: Tensor> IntoIterator for &'a Individual<T> {
+impl<'a, T: Tensor2> IntoIterator for &'a Individual<T> {
     type Item = &'a Layer<T>;
     type IntoIter = Iter<'a, Layer<T>>;
 
@@ -385,7 +403,6 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::activation::{Activation, Registered};
-    use crate::cost_function::CostFunction;
 
     type T = Array2<f64>;
 
