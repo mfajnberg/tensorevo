@@ -117,15 +117,11 @@ impl<T: Tensor> Individual<T> {
     /// Two vectors of tensors, the first being the weighted inputs to each layer and the second
     /// being the activations of each layer.
     fn forward_pass_memoized(&self, input: &T) -> (Vec<T>, Vec<T>) {
-        let num_layers = self.layers.len();
-        let mut weighted_inputs: Vec<T> = Vec::<T>::with_capacity(num_layers);
+        let num_layers = self.num_layers();
+        let mut weighted_inputs = Vec::<T>::with_capacity(num_layers);
         let mut activations = Vec::<T>::with_capacity(num_layers);
         let mut activation: T = input.clone();
         let mut weighted_input: T;
-        // TODO: See, if we actually need this first item in `backprop` (below).
-        //       Consider replacing this loop with `Iterator` methods.
-        //       https://github.com/mfajnberg/tensorevo/issues/21
-        activations.push(activation.clone());
         for layer in &self.layers {
             (weighted_input, activation) = layer.feed_forward(&activation);
             weighted_inputs.push(weighted_input);
@@ -151,6 +147,7 @@ impl<T: Tensor> Individual<T> {
     fn backprop(&self, input: &T, desired_output: &T) -> (Vec<T>, Vec<T>) {
         let (weighted_inputs, activations) = self.forward_pass_memoized(input);
         let num_layers = self.layers.len();
+        debug_assert_eq!(num_layers, activations.len(), "number of activations not equal to number of layers");
         // Initialize vectors to hold weights- and biases-gradients for all layers.
         let mut nabla_weights = Vec::<T>::with_capacity(num_layers);
         let mut nabla_biases = Vec::<T>::with_capacity(num_layers);
@@ -159,25 +156,27 @@ impl<T: Tensor> Individual<T> {
         // Activation of the last layer, i.e. the network's output:
         let output = activations.last().unwrap();
         // Derivative of the last layer's activation function with respect to its weighted input:
-        let activation_derivative = self.layers[num_layers - 1].activation.d(weighted_input);
+        let last_layer_idx = num_layers - 1;
+        let activation_derivative = self.layers[last_layer_idx].activation.d(weighted_input);
         // Derivative of the cost function with respect to the last layer's activation:
         let cost_derivative = self.cost_function.d(output, desired_output);
         // Delta of the last layer:
         let delta = cost_derivative * activation_derivative;
+        let previous_activation = &activations[last_layer_idx - 1];
         // Calculate and add the last layer's gradient components first.
-        nabla_weights.push(delta.dot(activations[num_layers - 2].transpose()));
+        nabla_weights.push(delta.dot(previous_activation.transpose()));
         nabla_biases.push(delta.sum_axis(1));
         // Loop over the remaining layer indices in reverse order,
-        // i.e. starting with the second to last index (`num_layers - 2`) and ending with `0`.
-        for layer_num in (0..num_layers - 1).rev() {
+        // i.e. starting with the second to last index and ending with `0`.
+        for layer_idx in (0..=last_layer_idx - 1).rev() {
             // Weighted input to the layer:
-            let weighted_input = &weighted_inputs[layer_num];
+            let weighted_input = &weighted_inputs[layer_idx];
             // Activation of the previous layer:
-            let previous_activation = if layer_num > 0 { &activations[layer_num - 1] } else { input };
+            let previous_activation = if layer_idx > 0 { &activations[layer_idx - 1] } else { input };
             // Derivative of the layer's activation function with respect to its weighted input:
-            let activation_derivative = self.layers[layer_num].activation.d(weighted_input);
+            let activation_derivative = self.layers[layer_idx].activation.d(weighted_input);
             // Delta of the layer:
-            let delta = self.layers[layer_num + 1].weights.transpose().dot(&delta) * activation_derivative;
+            let delta = self.layers[layer_idx + 1].weights.transpose().dot(&delta) * activation_derivative;
             // Calculate and add the layer's gradient components.
             nabla_weights.push(delta.dot(previous_activation.transpose()));
             nabla_biases.push(delta.sum_axis(1));
