@@ -235,6 +235,9 @@ impl<T: Tensor> Individual<T> {
         for (i, (batch_inputs, batch_desired_outputs)) in training_data.iter().enumerate() {
             trace!("batch: {}/{}", i+1, num_batches);
             self.stochastic_gradient_descent_step(batch_inputs, batch_desired_outputs, update_factor, validation_data);
+            for (layer_idx, layer) in self.iter().enumerate() {
+                trace!("layer {}\nweights:\n{}\nbiases:\n{}", layer_idx, layer.weights, layer.biases);
+            }
         }
     }
 
